@@ -46,100 +46,106 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded shadow-lg max-w-xl w-full p-6 overflow-auto max-h-[90vh]"
+        className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8 overflow-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
       >
-        <h2 className="text-2xl font-bold mb-4">
+        <h2 className="text-3xl font-extrabold mb-6 text-gray-900">
           {product.id ? 'Edit Product' : 'Add Product'}
         </h2>
 
-        <label className="block mb-2 font-semibold">
-          Title
+        <label className="block mb-5">
+          <span className="text-gray-700 font-semibold mb-1 block">Title</span>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="w-full border rounded px-3 py-2 mt-1"
+            placeholder="Product Title"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
           />
         </label>
 
-        <label className="block mb-2 font-semibold">
-          Description (HTML allowed)
+        <label className="block mb-5">
+          <span className="text-gray-700 font-semibold mb-1 block">Description (HTML allowed)</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={5}
-            className="w-full border rounded px-3 py-2 mt-1"
+            placeholder="Product description"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
           />
         </label>
 
-        <label className="block mb-2 font-semibold">
-          Categories (comma-separated)
+        <label className="block mb-5">
+          <span className="text-gray-700 font-semibold mb-1 block">Categories (comma-separated)</span>
           <input
             type="text"
             value={categories}
             onChange={(e) => setCategories(e.target.value)}
             placeholder="Category1, Category2"
-            className="w-full border rounded px-3 py-2 mt-1"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
           />
         </label>
 
-        <label className="block mb-2 font-semibold">
-          Images (one URL per line)
+        <label className="block mb-5">
+          <span className="text-gray-700 font-semibold mb-1 block">Images (one URL per line)</span>
           <textarea
             value={images}
             onChange={(e) => setImages(e.target.value)}
             rows={4}
             placeholder="https://example.com/image1.jpg"
-            className="w-full border rounded px-3 py-2 mt-1"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
           />
         </label>
 
-        <label className="block mb-2 font-semibold">
-          Tags (comma-separated)
+        <label className="block mb-5">
+          <span className="text-gray-700 font-semibold mb-1 block">Tags (comma-separated)</span>
           <input
             type="text"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
             placeholder="tag1, tag2"
-            className="w-full border rounded px-3 py-2 mt-1"
+            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
           />
         </label>
 
-        <label className="block mb-2 font-semibold">
-          SKU
-          <input
-            type="text"
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            className="w-full border rounded px-3 py-2 mt-1"
-          />
-        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
+          <label>
+            <span className="text-gray-700 font-semibold mb-1 block">SKU</span>
+            <input
+              type="text"
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="SKU"
+              className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+            />
+          </label>
 
-        <label className="block mb-4 font-semibold">
-          Barcode
-          <input
-            type="text"
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            className="w-full border rounded px-3 py-2 mt-1"
-          />
-        </label>
+          <label>
+            <span className="text-gray-700 font-semibold mb-1 block">Barcode</span>
+            <input
+              type="text"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="Barcode"
+              className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+            />
+          </label>
+        </div>
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-4">
           <button
             type="button"
             onClick={onCancel}
-            className="bg-gray-400 text-white px-4 py-2 rounded"
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-6 py-3 rounded-md transition"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition"
           >
             Save
           </button>
