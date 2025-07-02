@@ -135,17 +135,51 @@ export default function ProductEditor({ product, onSave, onCancel }) {
               className="w-full px-3 py-2 border rounded font-mono"
             />
           ) : (
-            <div
-              ref={liveRef}
-              className="border rounded p-3 min-h-[150px] overflow-auto"
-              contentEditable
-              suppressContentEditableWarning
-              onInput={(e) => setDescription(e.currentTarget.innerHTML)}
-              onKeyDown={handleKeyDown}
-              dangerouslySetInnerHTML={{ __html: description }}
-              style={{ whiteSpace: 'pre-wrap' }}
-              spellCheck={true}
-            />
+import React, { useState, useEffect, useRef } from 'react';
+
+export default function ProductEditor({ product, onSave, onCancel }) {
+  // ... your existing state hooks
+
+  const liveRef = useRef(null);
+  
+  // When description or tab changes, update live editor innerHTML only on tab switch or initial load
+  useEffect(() => {
+    if (tab === 'live' && liveRef.current) {
+      liveRef.current.innerHTML = description || '';
+    }
+  }, [tab, description]);
+
+  const handleInput = (e) => {
+    setDescription(e.currentTarget.innerHTML);
+  };
+
+  // ... rest of your code
+
+  return (
+    // ...
+    {tab === 'code' ? (
+      <textarea
+        rows={8}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="w-full px-3 py-2 border rounded font-mono"
+      />
+    ) : (
+      <div
+        ref={liveRef}
+        className="border rounded p-3 min-h-[150px] overflow-auto"
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
+        style={{ whiteSpace: 'pre-wrap' }}
+        spellCheck={true}
+      />
+    )}
+    // ...
+  );
+}
+
           )}
         </div>
 
