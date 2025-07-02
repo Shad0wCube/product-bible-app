@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css'; // Import Quill styles
 
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
@@ -8,8 +10,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const [tags, setTags] = useState(product.tags || []);
   const [editMode, setEditMode] = useState('live'); // 'live' or 'code'
 
-  const descriptionRef = useRef(null);
-
   useEffect(() => {
     setTitle(product.title || '');
     setDescription(product.description || '');
@@ -18,42 +18,8 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     setTags(product.tags || []);
   }, [product]);
 
-  // Cursor fix for Enter key in contentEditable (prevents cursor jump to start)
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-
-      // Insert <br> at cursor position
-      const sel = window.getSelection();
-      if (!sel.rangeCount) return;
-
-      const range = sel.getRangeAt(0);
-      const br = document.createElement('br');
-      range.deleteContents();
-      range.insertNode(br);
-
-      // Move cursor after the <br>
-      range.setStartAfter(br);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    }
-
-    // Undo (Ctrl+Z) and Redo (Ctrl+Y)
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      document.execCommand('undo');
-      e.preventDefault();
-    } else if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || 
-               ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
-      document.execCommand('redo');
-      e.preventDefault();
-    }
-  };
-
-  // Sync contentEditable div content with state
-  const handleDescriptionInput = (e) => {
-    setDescription(e.target.innerHTML);
-  };
+  // When switching from code -> live, parse HTML into ReactQuill
+  // When switching from live -> code, show raw HTML
 
   const handleSaveClick = () => {
     onSave({
@@ -84,7 +50,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Categories (comma separated) */}
+        {/* Categories */}
         <label className="block mb-4">
           <span className="font-semibold">Categories</span>
           <input
@@ -96,7 +62,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Tags (comma separated) */}
+        {/* Tags */}
         <label className="block mb-4">
           <span className="font-semibold">Tags</span>
           <input
@@ -108,7 +74,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Images (comma separated URLs) */}
+        {/* Images */}
         <label className="block mb-4">
           <span className="font-semibold">Images URLs</span>
           <input
@@ -120,7 +86,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Description with tabs for Code / Live */}
+        {/* Description Editor Tabs */}
         <div className="mb-4">
           <div className="flex mb-2 border-b">
             <button
@@ -138,15 +104,26 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           </div>
 
           {editMode === 'live' ? (
-            <div
-              ref={descriptionRef}
-              contentEditable
-              suppressContentEditableWarning
-              onInput={handleDescriptionInput}
-              onKeyDown={handleKeyDown}
-              className="border rounded p-3 min-h-[150px] overflow-auto prose max-w-none"
-              dangerouslySetInnerHTML={{ __html: description }}
-              spellCheck={true}
+            <ReactQuill
+              theme="snow"
+              value={description}
+              onChange={setDescription}
+              modules={{
+                toolbar: [
+                  [{ header: [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+                  [{ list: 'ordered' }, { list: 'bullet' }],
+                  ['link', 'image'],
+                  ['clean'],
+                ],
+              }}
+              formats={[
+                'header',
+                'bold', 'italic', 'underline', 'strike', 'blockquote',
+                'list', 'bullet',
+                'link', 'image',
+              ]}
+              style={{ minHeight: '150px' }}
             />
           ) : (
             <textarea
