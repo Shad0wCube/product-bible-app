@@ -1,7 +1,6 @@
-// src/components/ProductList.jsx
 import React, { useRef } from 'react';
-import Papa from 'papaparse';
 import { Link } from 'react-router-dom';
+import Papa from 'papaparse';
 
 export default function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
@@ -22,9 +21,8 @@ export default function ProductList({ products, setProducts, setSelected }) {
           const existing = imported.find((p) => p.title === row['Title']);
 
           if (existing) {
-            if (row['Image Src']) {
-              existing.images.push(row['Image Src']);
-            }
+            if (row['Image Src']) existing.images.push(row['Image Src']);
+            // Variants import could go here if needed
           } else {
             imported.push({
               id: crypto.randomUUID(),
@@ -33,7 +31,15 @@ export default function ProductList({ products, setProducts, setSelected }) {
               categories: row['Type'] ? [row['Type']] : [],
               images: row['Image Src'] ? [row['Image Src']] : [],
               tags: row['Tags'] ? row['Tags'].split(',').map(t => t.trim()) : [],
-              variants: [], // add empty variants array for consistency
+              variants: row['Variant SKU'] ? [{
+                sku: row['Variant SKU'],
+                option1: row['Option1 Value'] || '',
+                option2: row['Option2 Value'] || '',
+                option3: row['Option3 Value'] || '',
+                price: row['Variant Price'] || '',
+                barcode: row['Variant Barcode'] || '',
+                inventory_quantity: row['Variant Inventory Qty'] || 0,
+              }] : [],
             });
           }
         });
@@ -45,31 +51,48 @@ export default function ProductList({ products, setProducts, setSelected }) {
   };
 
   const handleExport = () => {
-    const csv = Papa.unparse(
-      products.map((p) => ({
-        ID: p.id,
-        Title: p.title,
-        Description: p.description,
-        Categories: p.categories?.join(', '),
-        Images: p.images?.join(', '),
-        Tags: p.tags?.join(', '),
-        Variants: p.variants
-          ? p.variants
-              .map((v) =>
-                [
-                  v.option1 || '',
-                  v.option2 || '',
-                  v.option3 || '',
-                  v.sku || '',
-                  v.price || '',
-                  v.inventory_quantity || '',
-                ].join('|')
-              )
-              .join(';;')
-          : '',
-      }))
-    );
+    // Flatten product data to Shopify style CSV for export
+    const rows = [];
 
+    products.forEach((p) => {
+      if (p.variants && p.variants.length > 0) {
+        p.variants.forEach((v, i) => {
+          rows.push({
+            'ID': p.id,
+            'Title': p.title,
+            'Body (HTML)': p.description,
+            'Type': p.categories?.join(', '),
+            'Tags': p.tags?.join(', '),
+            'Image Src': i === 0 ? (p.images?.[0] || '') : '',
+            'Variant SKU': v.sku,
+            'Option1 Value': v.option1,
+            'Option2 Value': v.option2,
+            'Option3 Value': v.option3,
+            'Variant Price': v.price,
+            'Variant Barcode': v.barcode,
+            'Variant Inventory Qty': v.inventory_quantity,
+          });
+        });
+      } else {
+        rows.push({
+          'ID': p.id,
+          'Title': p.title,
+          'Body (HTML)': p.description,
+          'Type': p.categories?.join(', '),
+          'Tags': p.tags?.join(', '),
+          'Image Src': p.images?.[0] || '',
+          'Variant SKU': '',
+          'Option1 Value': '',
+          'Option2 Value': '',
+          'Option3 Value': '',
+          'Variant Price': '',
+          'Variant Barcode': '',
+          'Variant Inventory Qty': '',
+        });
+      }
+    });
+
+    const csv = Papa.unparse(rows);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -80,17 +103,14 @@ export default function ProductList({ products, setProducts, setSelected }) {
   };
 
   const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    if (!window.confirm('This will permanently remove it. Confirm again?')) return;
 
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
   return (
     <div className="p-4 max-w-7xl mx-auto">
-      {/* Top Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
         <h1 className="text-3xl font-bold">Product Bible</h1>
         <div className="flex gap-2">
@@ -122,7 +142,6 @@ export default function ProductList({ products, setProducts, setSelected }) {
         </div>
       </div>
 
-      {/* Product Grid */}
       <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         {products.map((p) => (
           <div
