@@ -7,27 +7,23 @@ import {
 
 import ProductList from './components/ProductList';
 import ProductEditor from './components/ProductEditor';
-import ProductPage from './components/ProductPage'; // Make sure you have this component
+import ProductPage from './components/ProductPage';
 
 export default function App() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  // Load products from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('products');
     if (stored) setProducts(JSON.parse(stored));
   }, []);
 
-  // Save products to localStorage when they change
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
 
-  // Save or update product handler
   const handleSave = (product) => {
     if (!product.id) product.id = crypto.randomUUID();
-
     setProducts((prev) => {
       const exists = prev.find((p) => p.id === product.id);
       if (exists) {
@@ -36,7 +32,6 @@ export default function App() {
         return [...prev, product];
       }
     });
-
     setSelected(null);
   };
 
