@@ -10,19 +10,8 @@ import {
 } from 'react-router-dom';
 import ProductEditor from './components/ProductEditor';
 
-function ProductList({ products, setProducts, setSelected, handleDelete }) {
+function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
-  const [filterCategory, setFilterCategory] = useState('');
-
-  // Unique categories for filter dropdown
-  const allCategories = Array.from(
-    new Set(products.flatMap((p) => p.categories || []))
-  ).sort();
-
-  // Filter products by selected category
-  const filteredProducts = filterCategory
-    ? products.filter((p) => (p.categories || []).includes(filterCategory))
-    : products;
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -48,20 +37,15 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
               id: crypto.randomUUID(),
               title: row['Title'],
               description: row['Body (HTML)'] || '',
-              categories: row['Collection'] // Use Shopify 'Collection' as categories
-                ? row['Collection'].split(',').map((c) => c.trim())
-                : [],
+              categories: row['Type'] ? [row['Type']] : [],
               images: row['Image Src'] ? [row['Image Src']] : [],
-              tags: row['Tags'] ? row['Tags'].split(',').map((t) => t.trim()) : [],
-              sku: row['Variant SKU'] || '',
-              barcode: row['Variant Barcode'] || '',
+              tags: row['Tags'] ? row['Tags'].split(',').map(t => t.trim()) : [],
             });
           }
         });
 
         setProducts(imported);
         fileInputRef.current.value = null;
-        setFilterCategory('');
       },
     });
   };
@@ -72,11 +56,9 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
         ID: p.id,
         Title: p.title,
         Description: p.description,
-        Collection: p.categories?.join(', '),  // Shopify uses "Collection"
+        Categories: p.categories?.join(', '),
         Images: p.images?.join(', '),
         Tags: p.tags?.join(', '),
-        SKU: p.sku,
-        Barcode: p.barcode,
       }))
     );
 
@@ -89,12 +71,18 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
     document.body.removeChild(link);
   };
 
+  const handleDelete = (id) => {
+    if (!window.confirm('Are you sure you want to delete this product?')) return;
+    if (!window.confirm('This will permanently remove it. Confirm again?')) return;
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
   return (
     <div className="p-4 max-w-7xl mx-auto">
-      {/* Top Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
         <h1 className="text-3xl font-bold">Product Bible</h1>
-        <div className="flex gap-2 flex-wrap items-center">
+        <div className="flex gap-2">
           <button
             onClick={() => fileInputRef.current.click()}
             className="bg-green-600 text-white px-4 py-2 rounded shadow"
@@ -123,26 +111,8 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
         </div>
       </div>
 
-      {/* Filter by Category */}
-      <div className="mb-6">
-        <label className="mr-2 font-semibold">Filter by Category:</label>
-        <select
-          className="border rounded px-2 py-1"
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-        >
-          <option value="">-- All Categories --</option>
-          {allCategories.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Product Grid */}
       <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {filteredProducts.map((p) => (
+        {products.map((p) => (
           <div
             key={p.id}
             className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white"
@@ -162,20 +132,9 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
             </Link>
             <div className="p-4">
               <Link to={`/product/${p.id}`} className="block">
-                <h2 className="text-lg font-semibold mb-1 hover:underline text-blue-700">
-                  {p.title}
-                </h2>
+                <h2 className="text-lg font-semibold mb-1 hover:underline text-blue-700">{p.title}</h2>
               </Link>
-              <p className="text-sm text-gray-600 mb-1">
-                <strong>Category: </strong>
-                {p.categories?.join(', ') || '—'}
-              </p>
-              <p className="text-sm text-gray-600 mb-1">
-                <strong>SKU:</strong> {p.sku || '—'}
-              </p>
-              <p className="text-sm text-gray-600 mb-2">
-                <strong>Barcode:</strong> {p.barcode || '—'}
-              </p>
+              <p className="text-sm text-gray-600 mb-2">{p.categories?.join(', ')}</p>
               <div className="flex justify-between text-sm">
                 <button
                   onClick={() => setSelected(p)}
@@ -208,7 +167,10 @@ function ProductPage({ products }) {
     return (
       <div className="p-4 max-w-4xl mx-auto">
         <h2 className="text-2xl font-bold mb-4">Product Not Found</h2>
-        <button onClick={() => navigate('/')} className="text-blue-600 underline">
+        <button
+          onClick={() => navigate('/')}
+          className="text-blue-600 underline"
+        >
           Back to products
         </button>
       </div>
@@ -217,7 +179,10 @@ function ProductPage({ products }) {
 
   return (
     <div className="p-6 max-w-4xl mx-auto bg-white rounded shadow">
-      <button onClick={() => navigate('/')} className="mb-4 text-blue-600 underline">
+      <button
+        onClick={() => navigate('/')}
+        className="mb-4 text-blue-600 underline"
+      >
         &larr; Back to Products
       </button>
       <h1 className="text-3xl font-bold mb-4">{product.title}</h1>
@@ -225,7 +190,12 @@ function ProductPage({ products }) {
       {product.images && product.images.length > 0 && (
         <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
           {product.images.map((src, i) => (
-            <img key={i} src={src} alt={product.title} className="rounded border" />
+            <img
+              key={i}
+              src={src}
+              alt={product.title}
+              className="rounded border"
+            />
           ))}
         </div>
       )}
@@ -240,28 +210,13 @@ function ProductPage({ products }) {
 
       {product.categories && product.categories.length > 0 && (
         <div className="mb-2">
-          <strong>Category:</strong> {product.categories.join(', ')}
+          <strong>Categories:</strong> {product.categories.join(', ')}
         </div>
       )}
 
       {product.tags && product.tags.length > 0 && (
         <div className="mb-2">
           <strong>Tags:</strong> {product.tags.join(', ')}
-        </div>
-      )}
-
-      {(product.sku || product.barcode) && (
-        <div className="mb-2">
-          {product.sku && (
-            <div>
-              <strong>SKU:</strong> {product.sku}
-            </div>
-          )}
-          {product.barcode && (
-            <div>
-              <strong>Barcode:</strong> {product.barcode}
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -272,11 +227,13 @@ export default function AppWrapper() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
+  // Load from localStorage once at mount
   useEffect(() => {
-    const stored = localStorage.getItem('products');
-    if (stored) setProducts(JSON.parse(stored));
+    const saved = localStorage.getItem('products');
+    if (saved) setProducts(JSON.parse(saved));
   }, []);
 
+  // Save to localStorage whenever products change
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
@@ -294,15 +251,6 @@ export default function AppWrapper() {
     setSelected(null);
   };
 
-  const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
-
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
   return (
     <Router>
       <Routes>
@@ -314,7 +262,6 @@ export default function AppWrapper() {
                 products={products}
                 setProducts={setProducts}
                 setSelected={setSelected}
-                handleDelete={handleDelete}
               />
               {selected && (
                 <ProductEditor
@@ -326,7 +273,10 @@ export default function AppWrapper() {
             </>
           }
         />
-        <Route path="/product/:id" element={<ProductPage products={products} />} />
+        <Route
+          path="/product/:id"
+          element={<ProductPage products={products} />}
+        />
       </Routes>
     </Router>
   );
