@@ -1,237 +1,108 @@
-// frontend/src/App.jsx
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Papa from 'papaparse';
 import ProductEditor from './components/ProductEditor';
-
-// Helper: sanitize for CSV (escape quotes, commas)
-function csvEscape(value) {
-  if (value == null) return '';
-  const str = String(value);
-  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
-  }
-  return str;
-}
-
-// Convert product to one or more Shopify CSV rows (one per image)
-function productToShopifyRows(product) {
-  const baseRow = {
-    Handle: product.title.toLowerCase().replace(/\s+/g, '-'),
-    Title: product.title,
-    'Body (HTML)': product.description || '',
-    Vendor: 'YourVendor',
-    Type: product.categories ? product.categories.join(', ') : '',
-    Tags: product.categories ? product.categories.join(', ') : '',
-    Published: 'TRUE',
-    'Option1 Name': 'Title',
-    'Option1 Value': 'Default Title',
-    SKU: '',
-    'Variant Grams': '',
-    'Variant Inventory Tracker': '',
-    'Variant Inventory Qty': '',
-    'Variant Inventory Policy': 'deny',
-    'Variant Fulfillment Service': 'manual',
-    'Variant Price': '',
-    'Variant Compare At Price': '',
-    'Variant Requires Shipping': 'TRUE',
-    'Variant Taxable': 'TRUE',
-    'Variant Barcode': '',
-    'Metafield: specs': JSON.stringify(product.specifications || {}),
-  };
-
-  if (!product.images || product.images.length === 0) {
-    return [{ ...baseRow, 'Image Src': '', 'Image Position': '' }];
-  }
-
-  return product.images.map((imgUrl, idx) => ({
-    ...baseRow,
-    'Image Src': imgUrl,
-    'Image Position': idx + 1,
-  }));
-}
-
-// Export products to Shopify CSV string
-function exportProductsToShopifyCSV(products) {
-  if (!products.length) return '';
-  let allRows = [];
-  products.forEach(product => {
-    allRows = allRows.concat(productToShopifyRows(product));
-  });
-  const headers = Object.keys(allRows[0]);
-  const csvRows = [
-    headers.join(','),
-    ...allRows.map(row => headers.map(h => csvEscape(row[h])).join(',')),
-  ];
-  return csvRows.join('\n');
-}
-
-// Import Shopify CSV into product array
-function importShopifyCSV(csvText) {
-  const results = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  const productsMap = new Map();
-
-  results.data.forEach(row => {
-    const handle = row.Handle;
-    if (!handle) return;
-
-    let specs = {};
-    try {
-      specs = JSON.parse(row['Metafield: specs'] || '{}');
-    } catch {}
-
-    if (!productsMap.has(handle)) {
-      productsMap.set(handle, {
-        id: Date.now() + Math.random(),
-        title: row.Title || '',
-        description: row['Body (HTML)'] || '',
-        categories: row.Tags ? row.Tags.split(',').map(s => s.trim()) : [],
-        specifications: specs,
-        images: [],
-        documents: [],
-        videos: [],
-      });
-    }
-
-    const product = productsMap.get(handle);
-    const img = row['Image Src'];
-    if (img && !product.images.includes(img)) {
-      product.images.push(img);
-    }
-  });
-
-  return Array.from(productsMap.values());
-}
 
 export default function App() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  const fetchProducts = async () => {
-    const res = await axios.get('/api/products');
-    setProducts(res.data);
-  };
+  // Load from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('products');
+    if (stored) setProducts(JSON.parse(stored));
+  }, []);
 
-  const handleSave = async (product) => {
-    const formData = new FormData();
-    for (const key in product) {
-      if (Array.isArray(product[key])) {
-        formData.append(key, JSON.stringify(product[key]));
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('products', JSON.stringify(products));
+  }, [products]);
+
+  const handleSave = (product) => {
+    // Ensure unique ID
+    if (!product.id) {
+      product.id = crypto.randomUUID();
+    }
+
+    setProducts((prev) => {
+      const exists = prev.find((p) => p.id === product.id);
+      if (exists) {
+        return prev.map((p) => (p.id === product.id ? product : p));
       } else {
-        formData.append(key, product[key]);
+        return [...prev, product];
       }
-    }
-    if (product.id) {
-      await axios.put(`/api/products/${product.id}`, formData);
-    } else {
-      await axios.post('/api/products', formData);
-    }
-    fetchProducts();
+    });
     setSelected(null);
   };
 
-  const handleDelete = async (id) => {
-    await axios.delete(`/api/products/${id}`);
-    fetchProducts();
+  const handleDelete = (id) => {
+    const confirm1 = window.confirm('Are you sure you want to delete this product?');
+    if (!confirm1) return;
+
+    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
+    if (!confirm2) return;
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
   return (
-    <div className="p-4 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-4">
+    <div className="p-4 max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Product Bible</h1>
         <button
           onClick={() => setSelected({})}
-          className="bg-blue-500 text-white px-4 py-2 rounded"
+          className="bg-blue-600 text-white px-4 py-2 rounded shadow"
         >
           + Add Product
         </button>
       </div>
 
-      {/* Import / Export Buttons */}
-      <div className="flex gap-3 mb-6">
-        <button
-          onClick={() => {
-            const csv = exportProductsToShopifyCSV(products);
-            const blob = new Blob([csv], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'shopify-products-export.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          className="bg-green-600 text-white px-4 py-2 rounded"
-        >
-          Export Shopify CSV
-        </button>
-
-        <label className="bg-yellow-500 text-white px-4 py-2 rounded cursor-pointer">
-          Import Shopify CSV
-          <input
-            type="file"
-            accept=".csv"
-            className="hidden"
-            onChange={e => {
-              const file = e.target.files[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = event => {
-                try {
-                  const importedProducts = importShopifyCSV(event.target.result);
-                  setProducts(importedProducts);
-                  alert('Shopify CSV imported successfully!');
-                } catch (error) {
-                  alert('Failed to import CSV: ' + error.message);
-                }
-              };
-              reader.readAsText(file);
-              e.target.value = '';
-            }}
-          />
-        </label>
+      {/* Product Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {products.map((p) => (
+          <div
+            key={p.id}
+            className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white"
+          >
+            <div className="h-48 bg-gray-100 flex items-center justify-center">
+              {p.images && p.images[0] ? (
+                <img
+                  src={p.images[0]}
+                  alt={p.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="text-gray-400 text-sm">No Image</div>
+              )}
+            </div>
+            <div className="p-4">
+              <h2 className="text-lg font-semibold mb-1">{p.title}</h2>
+              <p className="text-sm text-gray-600 mb-2">
+                {p.categories?.join(', ')}
+              </p>
+              <div className="flex justify-between text-sm">
+                <button
+                  onClick={() => setSelected(p)}
+                  className="text-blue-600 hover:underline"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  className="text-red-500 hover:underline"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-
-<div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-  {products.map((p) => (
-    <div key={p.id} className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white">
-      <div className="h-48 bg-gray-100 flex items-center justify-center">
-        {p.images && p.images[0] ? (
-          <img
-            src={p.images[0]}
-            alt={p.title}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="text-gray-400 text-sm">No Image</div>
-        )}
-      </div>
-      <div className="p-4">
-        <h2 className="text-lg font-semibold mb-1">{p.title}</h2>
-        <p className="text-sm text-gray-600 mb-2">{p.categories?.join(', ')}</p>
-        <button
-          onClick={() => setSelected(p)}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => handleDelete(p.id)}
-          className="text-sm text-red-500 ml-4 hover:underline"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  ))}
-</div>
-
 
       {selected && (
-        <ProductEditor product={selected} onSave={handleSave} onCancel={() => setSelected(null)} />
+        <ProductEditor
+          product={selected}
+          onSave={handleSave}
+          onCancel={() => setSelected(null)}
+        />
       )}
     </div>
   );
