@@ -1,43 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Papa from 'papaparse';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useParams,
+  useNavigate,
+} from 'react-router-dom';
 import ProductEditor from './components/ProductEditor';
 
-export default function App() {
-  const [products, setProducts] = useState([]);
-  const [selected, setSelected] = useState(null);
+function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
-
-  // Load from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('products');
-    if (stored) setProducts(JSON.parse(stored));
-  }, []);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
-  }, [products]);
-
-  const handleSave = (product) => {
-    if (!product.id) product.id = crypto.randomUUID();
-    setProducts((prev) => {
-      const exists = prev.find((p) => p.id === product.id);
-      if (exists) {
-        return prev.map((p) => (p.id === product.id ? product : p));
-      } else {
-        return [...prev, product];
-      }
-    });
-    setSelected(null);
-  };
-
-  const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -52,7 +26,7 @@ export default function App() {
         rows.forEach((row) => {
           if (!row['Title']) return;
 
-          const existing = imported.find(p => p.title === row['Title']);
+          const existing = imported.find((p) => p.title === row['Title']);
 
           if (existing) {
             if (row['Image Src']) {
@@ -97,6 +71,15 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  const handleDelete = (id) => {
+    const confirm1 = window.confirm('Are you sure you want to delete this product?');
+    if (!confirm1) return;
+    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
+    if (!confirm2) return;
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
   return (
     <div className="p-4 max-w-7xl mx-auto">
       {/* Top Bar */}
@@ -138,22 +121,24 @@ export default function App() {
             key={p.id}
             className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white"
           >
-            <div className="h-48 bg-gray-100 flex items-center justify-center">
-              {p.images && p.images[0] ? (
-                <img
-                  src={p.images[0]}
-                  alt={p.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="text-gray-400 text-sm">No Image</div>
-              )}
-            </div>
+            <Link to={`/product/${p.id}`}>
+              <div className="h-48 bg-gray-100 flex items-center justify-center">
+                {p.images && p.images[0] ? (
+                  <img
+                    src={p.images[0]}
+                    alt={p.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="text-gray-400 text-sm">No Image</div>
+                )}
+              </div>
+            </Link>
             <div className="p-4">
-              <h2 className="text-lg font-semibold mb-1">{p.title}</h2>
-              <p className="text-sm text-gray-600 mb-2">
-                {p.categories?.join(', ')}
-              </p>
+              <Link to={`/product/${p.id}`} className="block">
+                <h2 className="text-lg font-semibold mb-1 hover:underline text-blue-700">{p.title}</h2>
+              </Link>
+              <p className="text-sm text-gray-600 mb-2">{p.categories?.join(', ')}</p>
               <div className="flex justify-between text-sm">
                 <button
                   onClick={() => setSelected(p)}
@@ -172,14 +157,143 @@ export default function App() {
           </div>
         ))}
       </div>
-
-      {selected && (
-        <ProductEditor
-          product={selected}
-          onSave={handleSave}
-          onCancel={() => setSelected(null)}
-        />
-      )}
     </div>
+  );
+}
+
+function ProductPage({ products }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  const product = products.find((p) => p.id === id);
+
+  if (!product) {
+    return (
+      <div className="p-4 max-w-4xl mx-auto">
+        <h2 className="text-2xl font-bold mb-4">Product Not Found</h2>
+        <button
+          onClick={() => navigate('/')}
+          className="text-blue-600 underline"
+        >
+          Back to products
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto bg-white rounded shadow">
+      <button
+        onClick={() => navigate('/')}
+        className="mb-4 text-blue-600 underline"
+      >
+        &larr; Back to Products
+      </button>
+      <h1 className="text-3xl font-bold mb-4">{product.title}</h1>
+
+      {product.images && product.images.length > 0 && (
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {product.images.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt={`${product.title} image ${i + 1}`}
+              className="rounded border"
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold">Description</h2>
+        <p
+          className="whitespace-pre-wrap"
+          dangerouslySetInnerHTML={{ __html: product.description }}
+        />
+      </div>
+
+      {product.categories && product.categories.length > 0 && (
+        <div className="mb-2">
+          <strong>Categories:</strong> {product.categories.join(', ')}
+        </div>
+      )}
+
+      {product.tags && product.tags.length > 0 && (
+        <div className="mb-2">
+          <strong>Tags:</strong> {product.tags.join(', ')}
+        </div>
+      )}
+
+      {/* Add more fields here: specs, docs, videos, price, etc */}
+
+    </div>
+  );
+}
+
+export default function AppWrapper() {
+  const [products, setProducts] = useState([]);
+  const [selected, setSelected] = useState(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('products');
+    if (stored) setProducts(JSON.parse(stored));
+  }, []);
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('products', JSON.stringify(products));
+  }, [products]);
+
+  const handleSave = (product) => {
+    if (!product.id) product.id = crypto.randomUUID();
+    setProducts((prev) => {
+      const exists = prev.find((p) => p.id === product.id);
+      if (exists) {
+        return prev.map((p) => (p.id === product.id ? product : p));
+      } else {
+        return [...prev, product];
+      }
+    });
+    setSelected(null);
+  };
+
+  const handleDelete = (id) => {
+    const confirm1 = window.confirm('Are you sure you want to delete this product?');
+    if (!confirm1) return;
+    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
+    if (!confirm2) return;
+
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  return (
+    <Router>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <ProductList
+                products={products}
+                setProducts={setProducts}
+                setSelected={setSelected}
+              />
+              {selected && (
+                <ProductEditor
+                  product={selected}
+                  onSave={handleSave}
+                  onCancel={() => setSelected(null)}
+                />
+              )}
+            </>
+          }
+        />
+        <Route
+          path="/product/:id"
+          element={<ProductPage products={products} />}
+        />
+      </Routes>
+    </Router>
   );
 }
