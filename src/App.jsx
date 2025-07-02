@@ -10,7 +10,7 @@ import {
 } from 'react-router-dom';
 import ProductEditor from './components/ProductEditor';
 
-function ProductList({ products, setProducts, setSelected }) {
+function ProductList({ products, setProducts, setSelected, handleDelete }) {
   const fileInputRef = useRef();
 
   const handleImport = (e) => {
@@ -71,15 +71,6 @@ function ProductList({ products, setProducts, setSelected }) {
     document.body.removeChild(link);
   };
 
-  const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
-
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
   return (
     <div className="p-4 max-w-7xl mx-auto">
       {/* Top Bar */}
@@ -126,7 +117,7 @@ function ProductList({ products, setProducts, setSelected }) {
                 {p.images && p.images[0] ? (
                   <img
                     src={p.images[0]}
-                    alt={p.title} // Simplified alt
+                    alt={p.title} // no redundant 'image' text
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -147,7 +138,13 @@ function ProductList({ products, setProducts, setSelected }) {
                   Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(p.id)}
+                  onClick={() => {
+                    const confirm1 = window.confirm('Are you sure you want to delete this product?');
+                    if (!confirm1) return;
+                    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
+                    if (!confirm2) return;
+                    handleDelete(p.id);
+                  }}
                   className="text-red-500 hover:underline"
                 >
                   Delete
@@ -197,7 +194,7 @@ function ProductPage({ products }) {
             <img
               key={i}
               src={src}
-              alt={product.title} // Simplified alt
+              alt={product.title} // no redundant 'image' text
               className="rounded border"
             />
           ))}
@@ -255,13 +252,7 @@ export default function AppWrapper() {
     setSelected(null);
   };
 
-  // Move handleDelete inside AppWrapper to avoid unused variable warnings in ProductPage
   const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
-
     setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
@@ -276,6 +267,7 @@ export default function AppWrapper() {
                 products={products}
                 setProducts={setProducts}
                 setSelected={setSelected}
+                handleDelete={handleDelete}
               />
               {selected && (
                 <ProductEditor
