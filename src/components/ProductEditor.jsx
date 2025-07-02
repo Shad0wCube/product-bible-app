@@ -10,6 +10,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const [tags, setTags] = useState(product.tags ? product.tags.join(', ') : '');
   const [sku, setSku] = useState(product.sku || '');
   const [barcode, setBarcode] = useState(product.barcode || '');
+  const [descMode, setDescMode] = useState('code'); // 'code' or 'preview'
 
   useEffect(() => {
     setTitle(product.title || '');
@@ -55,6 +56,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           {product.id ? 'Edit Product' : 'Add Product'}
         </h2>
 
+        {/* Title */}
         <label className="block mb-5">
           <span className="text-gray-700 font-semibold mb-1 block">Title</span>
           <input
@@ -67,17 +69,50 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
+        {/* Description with tabs */}
         <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Description (HTML allowed)</span>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-            placeholder="Product description"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-          />
+          <span className="text-gray-700 font-semibold mb-1 block">Description (HTML)</span>
+          <div className="mb-2 flex border border-gray-300 rounded-t-md overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setDescMode('code')}
+              className={`flex-1 py-2 text-center font-semibold ${
+                descMode === 'code'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              } transition`}
+            >
+              Code
+            </button>
+            <button
+              type="button"
+              onClick={() => setDescMode('preview')}
+              className={`flex-1 py-2 text-center font-semibold ${
+                descMode === 'preview'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              } transition`}
+            >
+              Preview
+            </button>
+          </div>
+          {descMode === 'code' ? (
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={6}
+              placeholder="Write HTML description here..."
+              className="w-full border border-gray-300 rounded-b-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition font-mono"
+            />
+          ) : (
+            <div
+              className="w-full border border-gray-300 rounded-b-md p-4 bg-gray-50 min-h-[150px] overflow-auto"
+              dangerouslySetInnerHTML={{ __html: description }}
+            />
+          )}
         </label>
 
+        {/* Categories */}
         <label className="block mb-5">
           <span className="text-gray-700 font-semibold mb-1 block">Categories (comma-separated)</span>
           <input
@@ -89,6 +124,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
+        {/* Images */}
         <label className="block mb-5">
           <span className="text-gray-700 font-semibold mb-1 block">Images (one URL per line)</span>
           <textarea
@@ -100,6 +136,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
+        {/* Tags */}
         <label className="block mb-5">
           <span className="text-gray-700 font-semibold mb-1 block">Tags (comma-separated)</span>
           <input
@@ -111,6 +148,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
+        {/* SKU & Barcode */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
           <label>
             <span className="text-gray-700 font-semibold mb-1 block">SKU</span>
@@ -135,6 +173,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           </label>
         </div>
 
+        {/* Buttons */}
         <div className="flex justify-end gap-4">
           <button
             type="button"
