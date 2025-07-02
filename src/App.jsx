@@ -14,20 +14,20 @@ function csvEscape(value) {
   return str;
 }
 
-// Convert your product to Shopify CSV row (simplified)
-function productToShopifyRow(product) {
-  return {
+// Convert product to one or more Shopify CSV rows (one per image)
+function productToShopifyRows(product) {
+  const baseRow = {
     Handle: product.title.toLowerCase().replace(/\s+/g, '-'),
     Title: product.title,
     'Body (HTML)': product.description || '',
-    Vendor: 'YourVendor', // Customize as needed
+    Vendor: 'YourVendor',
     Type: product.categories ? product.categories.join(', ') : '',
     Tags: product.categories ? product.categories.join(', ') : '',
     Published: 'TRUE',
     'Option1 Name': 'Title',
     'Option1 Value': 'Default Title',
-    SKU: '', // optional
-    'Variant Grams': '', // optional
+    SKU: '',
+    'Variant Grams': '',
     'Variant Inventory Tracker': '',
     'Variant Inventory Qty': '',
     'Variant Inventory Policy': 'deny',
@@ -37,46 +37,70 @@ function productToShopifyRow(product) {
     'Variant Requires Shipping': 'TRUE',
     'Variant Taxable': 'TRUE',
     'Variant Barcode': '',
-    'Image Src': '', // base64 images not supported in Shopify CSV
-    'Image Position': '1',
     'Metafield: specs': JSON.stringify(product.specifications || {}),
   };
+
+  if (!product.images || product.images.length === 0) {
+    return [{ ...baseRow, 'Image Src': '', 'Image Position': '' }];
+  }
+
+  return product.images.map((imgUrl, idx) => ({
+    ...baseRow,
+    'Image Src': imgUrl,
+    'Image Position': idx + 1,
+  }));
 }
 
-// Export all products to CSV string
+// Export products to Shopify CSV string
 function exportProductsToShopifyCSV(products) {
   if (!products.length) return '';
-  const headers = Object.keys(productToShopifyRow(products[0]));
+  let allRows = [];
+  products.forEach(product => {
+    allRows = allRows.concat(productToShopifyRows(product));
+  });
+  const headers = Object.keys(allRows[0]);
   const csvRows = [
     headers.join(','),
-    ...products.map(product => {
-      const row = productToShopifyRow(product);
-      return headers.map(h => csvEscape(row[h])).join(',');
-    }),
+    ...allRows.map(row => headers.map(h => csvEscape(row[h])).join(',')),
   ];
   return csvRows.join('\n');
 }
 
-// Import Shopify CSV and convert to your product format
+// Import Shopify CSV into product array
 function importShopifyCSV(csvText) {
   const results = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  const products = results.data.map(row => {
+  const productsMap = new Map();
+
+  results.data.forEach(row => {
+    const handle = row.Handle;
+    if (!handle) return;
+
     let specs = {};
     try {
       specs = JSON.parse(row['Metafield: specs'] || '{}');
     } catch {}
-    return {
-      id: Date.now() + Math.random(), // generate unique id
-      title: row.Title || '',
-      description: row['Body (HTML)'] || '',
-      categories: row.Tags ? row.Tags.split(',').map(s => s.trim()) : [],
-      specifications: specs,
-      documents: [], // can extend later
-      images: [],    // can extend later
-      videos: [],    // can extend later
-    };
+
+    if (!productsMap.has(handle)) {
+      productsMap.set(handle, {
+        id: Date.now() + Math.random(),
+        title: row.Title || '',
+        description: row['Body (HTML)'] || '',
+        categories: row.Tags ? row.Tags.split(',').map(s => s.trim()) : [],
+        specifications: specs,
+        images: [],
+        documents: [],
+        videos: [],
+      });
+    }
+
+    const product = productsMap.get(handle);
+    const img = row['Image Src'];
+    if (img && !product.images.includes(img)) {
+      product.images.push(img);
+    }
   });
-  return products;
+
+  return Array.from(productsMap.values());
 }
 
 export default function App() {
@@ -174,6 +198,7 @@ export default function App() {
       <table className="w-full table-auto border">
         <thead>
           <tr className="bg-gray-200">
+            <th className="border px-2 py-1">Image</th>
             <th className="border px-2 py-1">Title</th>
             <th className="border px-2 py-1">Category</th>
             <th className="border px-2 py-1">Actions</th>
@@ -182,11 +207,28 @@ export default function App() {
         <tbody>
           {products.map((p) => (
             <tr key={p.id}>
+              <td className="border px-2 py-1">
+                {p.images && p.images[0] ? (
+                  <img
+                    src={p.images[0]}
+                    alt={p.title}
+                    className="h-12 w-12 object-cover rounded"
+                  />
+                ) : (
+                  <div className="h-12 w-12 bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                    No Image
+                  </div>
+                )}
+              </td>
               <td className="border px-2 py-1">{p.title}</td>
               <td className="border px-2 py-1">{p.categories?.join(', ')}</td>
               <td className="border px-2 py-1">
-                <button className="text-blue-500 mr-2" onClick={() => setSelected(p)}>Edit</button>
-                <button className="text-red-500" onClick={() => handleDelete(p.id)}>Delete</button>
+                <button className="text-blue-500 mr-2" onClick={() => setSelected(p)}>
+                  Edit
+                </button>
+                <button className="text-red-500" onClick={() => handleDelete(p.id)}>
+                  Delete
+                </button>
               </td>
             </tr>
           ))}
@@ -194,11 +236,7 @@ export default function App() {
       </table>
 
       {selected && (
-        <ProductEditor
-          product={selected}
-          onSave={handleSave}
-          onCancel={() => setSelected(null)}
-        />
+        <ProductEditor product={selected} onSave={handleSave} onCancel={() => setSelected(null)} />
       )}
     </div>
   );
