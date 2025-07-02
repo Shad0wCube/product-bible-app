@@ -1,144 +1,167 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 export default function DescriptionEditor({ value, onChange }) {
+  const [html, setHtml] = useState('');
   const [mode, setMode] = useState('live'); // 'live' or 'code'
   const liveRef = useRef(null);
-  const [html, setHtml] = useState(value || '');
+  const codeRef = useRef(null);
 
-  // Sync prop value changes (e.g. reset)
+  // Initialize content with wrapping <p> to help lists work correctly
   useEffect(() => {
-    setHtml(value || '');
-    if (liveRef.current) liveRef.current.innerHTML = value || '';
+    let safeHtml = value || '';
+    if (safeHtml && !safeHtml.trim().startsWith('<p')) {
+      safeHtml = `<p>${safeHtml}</p>`;
+    }
+    setHtml(safeHtml);
+    if (liveRef.current) liveRef.current.innerHTML = safeHtml;
   }, [value]);
 
-  // Update parent on html change
+  // When switching mode or html changes, update the other pane
+  useEffect(() => {
+    if (mode === 'live') {
+      if (liveRef.current && liveRef.current.innerHTML !== html) {
+        liveRef.current.innerHTML = html;
+      }
+    } else {
+      if (codeRef.current && codeRef.current.value !== html) {
+        codeRef.current.value = html;
+      }
+    }
+  }, [html, mode]);
+
+  // Call onChange with updated HTML
   const updateHtml = (newHtml) => {
     setHtml(newHtml);
     if (onChange) onChange(newHtml);
   };
 
-  // When live editing content changes
+  // Called on input in live contenteditable div
   const onLiveInput = () => {
-    if (liveRef.current) {
-      updateHtml(liveRef.current.innerHTML);
-    }
+    if (!liveRef.current) return;
+    const newHtml = liveRef.current.innerHTML;
+    updateHtml(newHtml);
   };
 
-  // Toolbar command execution
+  // Called on input in code textarea
+  const onCodeInput = () => {
+    if (!codeRef.current) return;
+    const newHtml = codeRef.current.value;
+    updateHtml(newHtml);
+  };
+
+  // Execute document commands on live div
   const execCmd = (command, value = null) => {
+    if (!liveRef.current) return;
+    liveRef.current.focus();
     document.execCommand(command, false, value);
     onLiveInput();
   };
 
+  // Handle keyboard shortcuts in live contenteditable div
+  const onKeyDown = (e) => {
+    if (!e.ctrlKey) return;
+
+    switch (e.key.toLowerCase()) {
+      case 'b': // Ctrl+B bold
+        e.preventDefault();
+        execCmd('bold');
+        break;
+      case 'i': // Ctrl+I italic
+        e.preventDefault();
+        execCmd('italic');
+        break;
+      case 'u': // Ctrl+U underline
+        e.preventDefault();
+        execCmd('underline');
+        break;
+      case 'z': // Ctrl+Z undo
+        e.preventDefault();
+        execCmd('undo');
+        break;
+      case 'y': // Ctrl+Y redo
+        e.preventDefault();
+        execCmd('redo');
+        break;
+      default:
+        break;
+    }
+  };
+
   return (
-    <div className="mb-5">
-      <label className="block text-gray-700 font-semibold mb-1">Description (HTML)</label>
-      <div className="mb-2 flex border border-gray-300 rounded-t-md overflow-hidden">
+    <div className="border rounded p-4 bg-white">
+      {/* Toolbar */}
+      <div className="mb-3 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setMode('live')}
-          className={`flex-1 py-2 text-center font-semibold ${
-            mode === 'live'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          } transition`}
+          onClick={() => execCmd('bold')}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          title="Bold (Ctrl+B)"
         >
-          Live View
+          <b>B</b>
         </button>
         <button
           type="button"
-          onClick={() => setMode('code')}
-          className={`flex-1 py-2 text-center font-semibold ${
-            mode === 'code'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          } transition`}
+          onClick={() => execCmd('italic')}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          title="Italic (Ctrl+I)"
         >
-          Code View
+          <i>I</i>
+        </button>
+        <button
+          type="button"
+          onClick={() => execCmd('underline')}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          title="Underline (Ctrl+U)"
+        >
+          <u>U</u>
+        </button>
+        <button
+          type="button"
+          onClick={() => execCmd('insertUnorderedList')}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          title="Bullet List"
+        >
+          &#8226; List
+        </button>
+        <button
+          type="button"
+          onClick={() => execCmd('insertOrderedList')}
+          className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+          title="Numbered List"
+        >
+          1. List
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === 'live' ? 'code' : 'live')}
+          className="ml-auto px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+          title="Toggle Live / Code View"
+        >
+          {mode === 'live' ? 'Code View' : 'Live View'}
         </button>
       </div>
 
-      {mode === 'live' && (
-        <>
-          <div className="flex gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => execCmd('bold')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Bold"
-            >
-              <b>B</b>
-            </button>
-            <button
-              type="button"
-              onClick={() => execCmd('italic')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Italic"
-            >
-              <i>I</i>
-            </button>
-            <button
-              type="button"
-              onClick={() => execCmd('underline')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Underline"
-            >
-              <u>U</u>
-            </button>
-            <button
-              type="button"
-              onClick={() => execCmd('insertUnorderedList')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Bullet List"
-            >
-              &#8226; List
-            </button>
-            <button
-              type="button"
-              onClick={() => execCmd('insertOrderedList')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Numbered List"
-            >
-              1. List
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const url = prompt('Enter URL:');
-                if (url) execCmd('createLink', url);
-              }}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Insert Link"
-            >
-              🔗 Link
-            </button>
-            <button
-              type="button"
-              onClick={() => execCmd('removeFormat')}
-              className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-              title="Remove Formatting"
-            >
-              ✖
-            </button>
-          </div>
-
-          <div
-            ref={liveRef}
-            contentEditable
-            suppressContentEditableWarning={true}
-            className="border border-gray-300 rounded-b-md p-4 min-h-[150px] bg-white overflow-auto focus:outline-none focus:ring-2 focus:ring-blue-600 transition"
-            onInput={onLiveInput}
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
-        </>
-      )}
-
-      {mode === 'code' && (
+      {/* Editable Area */}
+      {mode === 'live' ? (
+        <div
+          ref={liveRef}
+          className="border rounded p-3 min-h-[200px] focus:outline-none"
+          contentEditable
+          spellCheck={true}
+          onInput={onLiveInput}
+          onKeyDown={onKeyDown}
+          suppressContentEditableWarning={true}
+          aria-label="HTML Editor"
+        />
+      ) : (
         <textarea
-          className="w-full border border-gray-300 rounded-md p-4 font-mono min-h-[150px] resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 transition"
+          ref={codeRef}
+          className="w-full h-48 border rounded p-3 font-mono text-sm"
           value={html}
-          onChange={(e) => updateHtml(e.target.value)}
+          onChange={onCodeInput}
           spellCheck={false}
+          aria-label="HTML Source Code"
         />
       )}
     </div>
