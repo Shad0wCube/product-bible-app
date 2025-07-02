@@ -2,6 +2,15 @@ import React, { useState } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
+const slugify = (text) =>
+  text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-');
+
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
   const [handle, setHandle] = useState(product.handle || '');
@@ -45,10 +54,11 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const removeVariant = (idx) => setVariants(variants.filter((_, i) => i !== idx));
 
   const handleSaveClick = () => {
+    const finalHandle = handle.trim() || slugify(title);
     onSave({
       ...product,
       title,
-      handle: handle || product.id, // fallback if empty
+      handle: finalHandle,
       description,
       categories,
       tags,
@@ -78,7 +88,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           className="w-full border rounded px-3 py-2 mb-4"
           value={handle}
           onChange={(e) => setHandle(e.target.value)}
-          placeholder="Leave empty to auto-generate"
+          placeholder="Leave empty to auto-generate from title"
         />
 
         {/* Description */}
@@ -105,7 +115,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           type="text"
           className="w-full border rounded px-3 py-2 mb-4"
           value={categories.join(', ')}
-          onChange={(e) => setCategories(e.target.value.split(',').map(s => s.trim()))}
+          onChange={(e) => setCategories(e.target.value.split(',').map((s) => s.trim()))}
           placeholder="Comma separated"
         />
 
@@ -115,7 +125,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           type="text"
           className="w-full border rounded px-3 py-2 mb-4"
           value={tags.join(', ')}
-          onChange={(e) => setTags(e.target.value.split(',').map(s => s.trim()))}
+          onChange={(e) => setTags(e.target.value.split(',').map((s) => s.trim()))}
           placeholder="Comma separated"
         />
 
@@ -147,10 +157,7 @@ export default function ProductEditor({ product, onSave, onCancel }) {
         {/* Variants */}
         <label className="block mb-2 font-semibold">Variants</label>
         {variants.map((v, i) => (
-          <div
-            key={v.id}
-            className="border p-3 mb-3 rounded bg-gray-50"
-          >
+          <div key={v.id} className="border p-3 mb-3 rounded bg-gray-50">
             <div className="flex flex-wrap gap-4 mb-2">
               <input
                 placeholder="SKU"
@@ -180,37 +187,37 @@ export default function ProductEditor({ product, onSave, onCancel }) {
             </div>
             <div className="flex flex-wrap gap-4 mb-2">
               <input
-                placeholder="Option1 Name"
+                placeholder="Option 1 Name (e.g. Colour)"
                 value={v.option1_name}
                 onChange={(e) => updateVariant(i, 'option1_name', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
               />
               <input
-                placeholder="Option1 Value"
+                placeholder="Option 1 Value (e.g. Red)"
                 value={v.option1_value}
                 onChange={(e) => updateVariant(i, 'option1_value', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
               />
               <input
-                placeholder="Option2 Name"
+                placeholder="Option 2 Name"
                 value={v.option2_name}
                 onChange={(e) => updateVariant(i, 'option2_name', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
               />
               <input
-                placeholder="Option2 Value"
+                placeholder="Option 2 Value"
                 value={v.option2_value}
                 onChange={(e) => updateVariant(i, 'option2_value', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
               />
               <input
-                placeholder="Option3 Name"
+                placeholder="Option 3 Name"
                 value={v.option3_name}
                 onChange={(e) => updateVariant(i, 'option3_name', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
               />
               <input
-                placeholder="Option3 Value"
+                placeholder="Option 3 Value"
                 value={v.option3_value}
                 onChange={(e) => updateVariant(i, 'option3_value', e.target.value)}
                 className="border rounded px-2 py-1 w-32"
@@ -219,6 +226,8 @@ export default function ProductEditor({ product, onSave, onCancel }) {
             <button
               onClick={() => removeVariant(i)}
               className="bg-red-600 text-white px-3 rounded"
+              disabled={variants.length === 1}
+              title={variants.length === 1 ? 'At least one variant required' : 'Remove Variant'}
             >
               Remove Variant
             </button>
