@@ -193,7 +193,7 @@ export default function App() {
             }}
           />
         </label>
-      </div0>
+      </div>
 
 <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
   {products.map((p) => (
