@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
@@ -7,8 +7,8 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const [tags, setTags] = useState((product.tags || []).join(', '));
   const [description, setDescription] = useState(product.description || '');
   const [tab, setTab] = useState('live'); // 'live' or 'code'
+  const liveRef = useRef(null);
 
-  // Update local states if product prop changes (e.g., editing a different product)
   useEffect(() => {
     setTitle(product.title || '');
     setCategories((product.categories || []).join(', '));
@@ -18,7 +18,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     setTab('live');
   }, [product]);
 
-  // Handle image URLs input as a single textarea (one URL per line)
   const handleImagesChange = (e) => {
     const urls = e.target.value
       .split('\n')
@@ -27,7 +26,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     setImages(urls);
   };
 
-  // Helper to convert comma-separated string to trimmed array
   const parseCSV = (str) => {
     return str
       .split(',')
@@ -35,7 +33,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
       .filter((s) => s.length);
   };
 
-  // Prepare product data for saving
   const handleSaveClick = () => {
     const updated = {
       ...product,
@@ -48,12 +45,25 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     onSave(updated);
   };
 
+  // Keyboard shortcut handler for live editor
+  const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      document.execCommand('undo');
+    } else if (
+      ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+      ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')
+    ) {
+      e.preventDefault();
+      document.execCommand('redo');
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start overflow-auto z-50 p-6">
       <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6">
         <h2 className="text-2xl font-bold mb-4">{product.id ? 'Edit Product' : 'Add New Product'}</h2>
 
-        {/* Title */}
         <label className="block mb-3">
           <span className="font-semibold">Title</span>
           <input
@@ -64,7 +74,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Categories (Collections) */}
         <label className="block mb-3">
           <span className="font-semibold">Categories (comma separated)</span>
           <input
@@ -76,7 +85,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Tags */}
         <label className="block mb-3">
           <span className="font-semibold">Tags (comma separated)</span>
           <input
@@ -88,7 +96,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Images */}
         <label className="block mb-3">
           <span className="font-semibold">Image URLs (one per line)</span>
           <textarea
@@ -100,7 +107,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           />
         </label>
 
-        {/* Description editor with tabs */}
         <div className="mb-3">
           <div className="flex border-b border-gray-300 mb-1">
             <button
@@ -130,17 +136,19 @@ export default function ProductEditor({ product, onSave, onCancel }) {
             />
           ) : (
             <div
+              ref={liveRef}
               className="border rounded p-3 min-h-[150px] overflow-auto"
               contentEditable
               suppressContentEditableWarning
               onInput={(e) => setDescription(e.currentTarget.innerHTML)}
+              onKeyDown={handleKeyDown}
               dangerouslySetInnerHTML={{ __html: description }}
               style={{ whiteSpace: 'pre-wrap' }}
+              spellCheck={true}
             />
           )}
         </div>
 
-        {/* Buttons */}
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
