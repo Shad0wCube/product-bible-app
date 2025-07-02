@@ -1,190 +1,136 @@
 import React, { useState, useEffect } from 'react';
+import DescriptionEditor from './DescriptionEditor';
 
-export default function ProductEditor({ product, onSave, onCancel }) {
+export default function ProductEditor({ product = {}, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
   const [description, setDescription] = useState(product.description || '');
-  const [categories, setCategories] = useState(
-    product.categories ? product.categories.join(', ') : ''
-  );
-  const [images, setImages] = useState(product.images ? product.images.join('\n') : '');
-  const [tags, setTags] = useState(product.tags ? product.tags.join(', ') : '');
-  const [sku, setSku] = useState(product.sku || '');
-  const [barcode, setBarcode] = useState(product.barcode || '');
-  const [descMode, setDescMode] = useState('code'); // 'code' or 'preview'
+  const [categories, setCategories] = useState(product.categories || []);
+  const [tags, setTags] = useState(product.tags || []);
+  const [images, setImages] = useState(product.images || []);
+  const [documents, setDocuments] = useState(product.documents || []);
 
+  // Sync props changes (if product changes while editing)
   useEffect(() => {
     setTitle(product.title || '');
     setDescription(product.description || '');
-    setCategories(product.categories ? product.categories.join(', ') : '');
-    setImages(product.images ? product.images.join('\n') : '');
-    setTags(product.tags ? product.tags.join(', ') : '');
-    setSku(product.sku || '');
-    setBarcode(product.barcode || '');
+    setCategories(product.categories || []);
+    setTags(product.tags || []);
+    setImages(product.images || []);
+    setDocuments(product.documents || []);
   }, [product]);
+
+  // Helper: split input by commas into trimmed array
+  const parseCSV = (input) =>
+    input
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+  // For categories and tags input
+  const onCategoriesChange = (e) => {
+    setCategories(parseCSV(e.target.value));
+  };
+  const onTagsChange = (e) => {
+    setTags(parseCSV(e.target.value));
+  };
+
+  // For images and docs input, simple comma-separated URLs
+  const onImagesChange = (e) => {
+    setImages(parseCSV(e.target.value));
+  };
+  const onDocumentsChange = (e) => {
+    setDocuments(parseCSV(e.target.value));
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const updated = {
+    onSave({
       ...product,
-      title: title.trim(),
+      title,
       description,
-      categories: categories
-        ? categories.split(',').map((c) => c.trim()).filter(Boolean)
-        : [],
-      images: images
-        ? images
-            .split('\n')
-            .map((url) => url.trim())
-            .filter(Boolean)
-        : [],
-      tags: tags
-        ? tags.split(',').map((t) => t.trim()).filter(Boolean)
-        : [],
-      sku: sku.trim(),
-      barcode: barcode.trim(),
-    };
-    onSave(updated);
+      categories,
+      tags,
+      images,
+      documents,
+    });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-start pt-12 z-50 overflow-auto">
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8 overflow-auto max-h-[90vh] scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+        className="bg-white rounded-md shadow-lg p-6 max-w-3xl w-full mx-4"
       >
-        <h2 className="text-3xl font-extrabold mb-6 text-gray-900">
-          {product.id ? 'Edit Product' : 'Add Product'}
-        </h2>
+        <h2 className="text-2xl font-bold mb-4">{product.id ? 'Edit Product' : 'Add Product'}</h2>
 
-        {/* Title */}
-        <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Title</span>
+        <label className="block mb-3">
+          <span className="font-semibold text-gray-700">Title</span>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            placeholder="Product Title"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+            className="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-blue-600 focus:border-blue-600"
           />
         </label>
 
-        {/* Description with tabs */}
-        <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Description (HTML)</span>
-          <div className="mb-2 flex border border-gray-300 rounded-t-md overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setDescMode('code')}
-              className={`flex-1 py-2 text-center font-semibold ${
-                descMode === 'code'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              } transition`}
-            >
-              Code
-            </button>
-            <button
-              type="button"
-              onClick={() => setDescMode('preview')}
-              className={`flex-1 py-2 text-center font-semibold ${
-                descMode === 'preview'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              } transition`}
-            >
-              Preview
-            </button>
-          </div>
-          {descMode === 'code' ? (
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={6}
-              placeholder="Write HTML description here..."
-              className="w-full border border-gray-300 rounded-b-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition font-mono"
-            />
-          ) : (
-            <div
-              className="w-full border border-gray-300 rounded-b-md p-4 bg-gray-50 min-h-[150px] overflow-auto"
-              dangerouslySetInnerHTML={{ __html: description }}
-            />
-          )}
-        </label>
+        <DescriptionEditor value={description} onChange={setDescription} />
 
-        {/* Categories */}
-        <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Categories (comma-separated)</span>
+        <label className="block mb-3">
+          <span className="font-semibold text-gray-700">Categories (comma separated)</span>
           <input
             type="text"
-            value={categories}
-            onChange={(e) => setCategories(e.target.value)}
-            placeholder="Category1, Category2"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+            value={categories.join(', ')}
+            onChange={onCategoriesChange}
+            placeholder="e.g. Hardware, Tools"
+            className="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-blue-600 focus:border-blue-600"
           />
         </label>
 
-        {/* Images */}
-        <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Images (one URL per line)</span>
-          <textarea
-            value={images}
-            onChange={(e) => setImages(e.target.value)}
-            rows={4}
-            placeholder="https://example.com/image1.jpg"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 resize-y focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-          />
-        </label>
-
-        {/* Tags */}
-        <label className="block mb-5">
-          <span className="text-gray-700 font-semibold mb-1 block">Tags (comma-separated)</span>
+        <label className="block mb-3">
+          <span className="font-semibold text-gray-700">Tags (comma separated)</span>
           <input
             type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="tag1, tag2"
-            className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+            value={tags.join(', ')}
+            onChange={onTagsChange}
+            placeholder="e.g. durable, steel, anodized"
+            className="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-blue-600 focus:border-blue-600"
           />
         </label>
 
-        {/* SKU & Barcode */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6">
-          <label>
-            <span className="text-gray-700 font-semibold mb-1 block">SKU</span>
-            <input
-              type="text"
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-              placeholder="SKU"
-              className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-            />
-          </label>
+        <label className="block mb-3">
+          <span className="font-semibold text-gray-700">Images URLs (comma separated)</span>
+          <input
+            type="text"
+            value={images.join(', ')}
+            onChange={onImagesChange}
+            placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+            className="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
 
-          <label>
-            <span className="text-gray-700 font-semibold mb-1 block">Barcode</span>
-            <input
-              type="text"
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              placeholder="Barcode"
-              className="w-full border border-gray-300 rounded-md px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
-            />
-          </label>
-        </div>
+        <label className="block mb-5">
+          <span className="font-semibold text-gray-700">Documents URLs (comma separated)</span>
+          <input
+            type="text"
+            value={documents.join(', ')}
+            onChange={onDocumentsChange}
+            placeholder="https://example.com/manual.pdf"
+            className="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-blue-600 focus:border-blue-600"
+          />
+        </label>
 
-        {/* Buttons */}
-        <div className="flex justify-end gap-4">
+        <div className="flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold px-6 py-3 rounded-md transition"
+            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-md transition"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Save
           </button>
