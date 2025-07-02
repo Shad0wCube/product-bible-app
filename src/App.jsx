@@ -126,7 +126,7 @@ function ProductList({ products, setProducts, setSelected }) {
                 {p.images && p.images[0] ? (
                   <img
                     src={p.images[0]}
-                    alt={p.title}
+                    alt={p.title} // Simplified alt
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -197,7 +197,7 @@ function ProductPage({ products }) {
             <img
               key={i}
               src={src}
-              alt={`${product.title} image ${i + 1}`}
+              alt={product.title} // Simplified alt
               className="rounded border"
             />
           ))}
@@ -223,9 +223,6 @@ function ProductPage({ products }) {
           <strong>Tags:</strong> {product.tags.join(', ')}
         </div>
       )}
-
-      {/* Add more fields here: specs, docs, videos, price, etc */}
-
     </div>
   );
 }
@@ -258,6 +255,7 @@ export default function AppWrapper() {
     setSelected(null);
   };
 
+  // Move handleDelete inside AppWrapper to avoid unused variable warnings in ProductPage
   const handleDelete = (id) => {
     const confirm1 = window.confirm('Are you sure you want to delete this product?');
     if (!confirm1) return;
