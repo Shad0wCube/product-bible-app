@@ -193,47 +193,42 @@ export default function App() {
             }}
           />
         </label>
-      </div>
+      </div0>
 
-      <table className="w-full table-auto border">
-        <thead>
-          <tr className="bg-gray-200">
-            <th className="border px-2 py-1">Image</th>
-            <th className="border px-2 py-1">Title</th>
-            <th className="border px-2 py-1">Category</th>
-            <th className="border px-2 py-1">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id}>
-              <td className="border px-2 py-1">
-                {p.images && p.images[0] ? (
-                  <img
-                    src={p.images[0]}
-                    alt={p.title}
-                    className="h-12 w-12 object-cover rounded"
-                  />
-                ) : (
-                  <div className="h-12 w-12 bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
-                    No Image
-                  </div>
-                )}
-              </td>
-              <td className="border px-2 py-1">{p.title}</td>
-              <td className="border px-2 py-1">{p.categories?.join(', ')}</td>
-              <td className="border px-2 py-1">
-                <button className="text-blue-500 mr-2" onClick={() => setSelected(p)}>
-                  Edit
-                </button>
-                <button className="text-red-500" onClick={() => handleDelete(p.id)}>
-                  Delete
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+<div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+  {products.map((p) => (
+    <div key={p.id} className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white">
+      <div className="h-48 bg-gray-100 flex items-center justify-center">
+        {p.images && p.images[0] ? (
+          <img
+            src={p.images[0]}
+            alt={p.title}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="text-gray-400 text-sm">No Image</div>
+        )}
+      </div>
+      <div className="p-4">
+        <h2 className="text-lg font-semibold mb-1">{p.title}</h2>
+        <p className="text-sm text-gray-600 mb-2">{p.categories?.join(', ')}</p>
+        <button
+          onClick={() => setSelected(p)}
+          className="text-sm text-blue-600 hover:underline"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => handleDelete(p.id)}
+          className="text-sm text-red-500 ml-4 hover:underline"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
+
 
       {selected && (
         <ProductEditor product={selected} onSave={handleSave} onCancel={() => setSelected(null)} />
