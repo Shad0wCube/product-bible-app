@@ -125,14 +125,14 @@ export default function ProductEditor({ product, onSave, onCancel }) {
                 onChange={(e) => handleVariantChange(i, 'option1', e.target.value)}
                 className="border rounded p-1 w-24"
               />
-              <input
-                type="text"
-                placeholder="Option 2"
-                value={v.option2}
-                onChange={(e) => handleVariantChange(i, 'option2', e.target                value={v.option2}
-                onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
-                className="border rounded p-1 w-24"
-              />
+<input
+  type="text"
+  placeholder="Option 2"
+  value={v.option2}
+  onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
+  className="border rounded p-1 w-24"
+/>
+
               <input
                 type="text"
                 placeholder="Option 3"
