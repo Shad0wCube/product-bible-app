@@ -1,115 +1,192 @@
-import React, { useState, useEffect } from 'react';
+// frontend/src/App.jsx
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import Papa from 'papaparse';
 import ProductEditor from './components/ProductEditor';
 
-const LOCAL_STORAGE_KEY = 'productBibleData';
+// Helper: sanitize for CSV (escape quotes, commas)
+function csvEscape(value) {
+  if (value == null) return '';
+  const str = String(value);
+  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+// Convert your product to Shopify CSV row (simplified)
+function productToShopifyRow(product) {
+  return {
+    Handle: product.title.toLowerCase().replace(/\s+/g, '-'),
+    Title: product.title,
+    'Body (HTML)': product.description || '',
+    Vendor: 'YourVendor', // Customize as needed
+    Type: product.categories ? product.categories.join(', ') : '',
+    Tags: product.categories ? product.categories.join(', ') : '',
+    Published: 'TRUE',
+    'Option1 Name': 'Title',
+    'Option1 Value': 'Default Title',
+    SKU: '', // optional
+    'Variant Grams': '', // optional
+    'Variant Inventory Tracker': '',
+    'Variant Inventory Qty': '',
+    'Variant Inventory Policy': 'deny',
+    'Variant Fulfillment Service': 'manual',
+    'Variant Price': '',
+    'Variant Compare At Price': '',
+    'Variant Requires Shipping': 'TRUE',
+    'Variant Taxable': 'TRUE',
+    'Variant Barcode': '',
+    'Image Src': '', // base64 images not supported in Shopify CSV
+    'Image Position': '1',
+    'Metafield: specs': JSON.stringify(product.specifications || {}),
+  };
+}
+
+// Export all products to CSV string
+function exportProductsToShopifyCSV(products) {
+  if (!products.length) return '';
+  const headers = Object.keys(productToShopifyRow(products[0]));
+  const csvRows = [
+    headers.join(','),
+    ...products.map(product => {
+      const row = productToShopifyRow(product);
+      return headers.map(h => csvEscape(row[h])).join(',');
+    }),
+  ];
+  return csvRows.join('\n');
+}
+
+// Import Shopify CSV and convert to your product format
+function importShopifyCSV(csvText) {
+  const results = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const products = results.data.map(row => {
+    let specs = {};
+    try {
+      specs = JSON.parse(row['Metafield: specs'] || '{}');
+    } catch {}
+    return {
+      id: Date.now() + Math.random(), // generate unique id
+      title: row.Title || '',
+      description: row['Body (HTML)'] || '',
+      categories: row.Tags ? row.Tags.split(',').map(s => s.trim()) : [],
+      specifications: specs,
+      documents: [], // can extend later
+      images: [],    // can extend later
+      videos: [],    // can extend later
+    };
+  });
+  return products;
+}
 
 export default function App() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      setProducts(JSON.parse(saved));
+  const fetchProducts = async () => {
+    const res = await axios.get('/api/products');
+    setProducts(res.data);
+  };
+
+  const handleSave = async (product) => {
+    const formData = new FormData();
+    for (const key in product) {
+      if (Array.isArray(product[key])) {
+        formData.append(key, JSON.stringify(product[key]));
+      } else {
+        formData.append(key, product[key]);
+      }
     }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(products));
-  }, [products]);
-
-  const handleSave = (product) => {
     if (product.id) {
-      setProducts(products.map(p => (p.id === product.id ? product : p)));
+      await axios.put(`/api/products/${product.id}`, formData);
     } else {
-      product.id = Date.now();
-      setProducts([...products, product]);
+      await axios.post('/api/products', formData);
     }
+    fetchProducts();
     setSelected(null);
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('Delete this product?')) {
-      setProducts(products.filter(p => p.id !== id));
-    }
+  const handleDelete = async (id) => {
+    await axios.delete(`/api/products/${id}`);
+    fetchProducts();
   };
 
-  const handleExport = () => {
-    const blob = new Blob([JSON.stringify(products, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'product-bible-backup.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const imported = JSON.parse(event.target.result);
-        if (Array.isArray(imported)) {
-          setProducts(imported);
-          alert('Import successful');
-        } else {
-          alert('Invalid format');
-        }
-      } catch {
-        alert('Error parsing JSON');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <header className="flex justify-between items-center mb-6">
+    <div className="p-4 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Product Bible</h1>
-        <div className="flex gap-3">
-          <button onClick={() => setSelected({})} className="bg-blue-600 text-white px-4 py-2 rounded">+ Add Product</button>
-          <button onClick={handleExport} className="bg-green-600 text-white px-4 py-2 rounded">Export JSON</button>
-          <label className="bg-yellow-500 text-white px-4 py-2 rounded cursor-pointer">
-            Import JSON
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              className="hidden"
-              title="Import JSON backup"
-            />
-          </label>
-        </div>
-      </header>
+        <button
+          onClick={() => setSelected({})}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          + Add Product
+        </button>
+      </div>
 
-      <table className="w-full border-collapse border border-gray-300">
+      {/* Import / Export Buttons */}
+      <div className="flex gap-3 mb-6">
+        <button
+          onClick={() => {
+            const csv = exportProductsToShopifyCSV(products);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'shopify-products-export.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="bg-green-600 text-white px-4 py-2 rounded"
+        >
+          Export Shopify CSV
+        </button>
+
+        <label className="bg-yellow-500 text-white px-4 py-2 rounded cursor-pointer">
+          Import Shopify CSV
+          <input
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = event => {
+                try {
+                  const importedProducts = importShopifyCSV(event.target.result);
+                  setProducts(importedProducts);
+                  alert('Shopify CSV imported successfully!');
+                } catch (error) {
+                  alert('Failed to import CSV: ' + error.message);
+                }
+              };
+              reader.readAsText(file);
+              e.target.value = '';
+            }}
+          />
+        </label>
+      </div>
+
+      <table className="w-full table-auto border">
         <thead>
           <tr className="bg-gray-200">
-            <th className="border border-gray-300 px-2 py-1 text-left">Title</th>
-            <th className="border border-gray-300 px-2 py-1 text-left">Categories</th>
-            <th className="border border-gray-300 px-2 py-1 text-left">Actions</th>
+            <th className="border px-2 py-1">Title</th>
+            <th className="border px-2 py-1">Category</th>
+            <th className="border px-2 py-1">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {products.length === 0 && (
-            <tr><td colSpan={3} className="text-center p-4">No products yet</td></tr>
-          )}
-          {products.map(p => (
-            <tr key={p.id} className="hover:bg-gray-100">
-              <td className="border border-gray-300 px-2 py-1">{p.title}</td>
-              <td className="border border-gray-300 px-2 py-1">{(p.categories || []).join(', ')}</td>
-              <td className="border border-gray-300 px-2 py-1">
-                <button
-                  onClick={() => setSelected(p)}
-                  className="text-blue-600 mr-2 hover:underline"
-                >Edit</button>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="text-red-600 hover:underline"
-                >Delete</button>
+          {products.map((p) => (
+            <tr key={p.id}>
+              <td className="border px-2 py-1">{p.title}</td>
+              <td className="border px-2 py-1">{p.categories?.join(', ')}</td>
+              <td className="border px-2 py-1">
+                <button className="text-blue-500 mr-2" onClick={() => setSelected(p)}>Edit</button>
+                <button className="text-red-500" onClick={() => handleDelete(p.id)}>Delete</button>
               </td>
             </tr>
           ))}
