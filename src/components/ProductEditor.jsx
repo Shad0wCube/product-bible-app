@@ -1,257 +1,252 @@
 import React, { useState } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-
-const slugify = (text) =>
-  text
-    .toString()
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\w-]+/g, '')
-    .replace(/--+/g, '-');
-
+import DescriptionEditor from './DescriptionEditor';
 
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
-  const [handle, setHandle] = useState(product.handle || '');
   const [description, setDescription] = useState(product.description || '');
   const [categories, setCategories] = useState(product.categories || []);
   const [tags, setTags] = useState(product.tags || []);
   const [images, setImages] = useState(product.images || []);
   const [variants, setVariants] = useState(product.variants || []);
 
-  const addImage = () => setImages([...images, '']);
-  const updateImage = (idx, val) => {
-    const copy = [...images];
-    copy[idx] = val;
-    setImages(copy);
-  };
-  const removeImage = (idx) => setImages(images.filter((_, i) => i !== idx));
+  const [newVariant, setNewVariant] = useState({
+    sku: '',
+    option1: '',
+    option2: '',
+    option3: '',
+    price: '',
+    barcode: '',
+    inventory_quantity: 0,
+  });
 
-  const addVariant = () => {
-    setVariants([
-      ...variants,
-      {
-        id: crypto.randomUUID(),
-        sku: '',
-        price: '',
-        barcode: '',
-        inventory_quantity: '',
-        option1_name: '',
-        option1_value: '',
-        option2_name: '',
-        option2_value: '',
-        option3_name: '',
-        option3_value: '',
-      },
-    ]);
+  const handleAddVariant = () => {
+    if (!newVariant.sku) return alert('Variant SKU is required');
+    setVariants([...variants, newVariant]);
+    setNewVariant({
+      sku: '',
+      option1: '',
+      option2: '',
+      option3: '',
+      price: '',
+      barcode: '',
+      inventory_quantity: 0,
+    });
   };
-  const updateVariant = (idx, field, val) => {
-    const copy = [...variants];
-    copy[idx][field] = val;
-    setVariants(copy);
+
+  const handleVariantChange = (index, field, value) => {
+    const newVariants = [...variants];
+    newVariants[index][field] = value;
+    setVariants(newVariants);
   };
-  const removeVariant = (idx) => setVariants(variants.filter((_, i) => i !== idx));
+
+  const handleRemoveVariant = (index) => {
+    if (!window.confirm('Are you sure you want to delete this variant?')) return;
+    setVariants(variants.filter((_, i) => i !== index));
+  };
 
   const handleSaveClick = () => {
-    const finalHandle = handle.trim() || slugify(title);
     onSave({
       ...product,
       title,
-      handle: finalHandle,
       description,
       categories,
       tags,
-      images: images.filter((img) => img.trim()),
+      images,
       variants,
     });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start pt-10 overflow-auto z-50">
-      <div className="bg-white rounded-lg p-6 max-w-4xl w-full shadow-lg">
-        <h2 className="text-2xl font-bold mb-4">Edit Product</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-start p-6 overflow-auto z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-4">{product.id ? 'Edit Product' : 'Add Product'}</h2>
 
-        {/* Title */}
-        <label className="block mb-2 font-semibold">Title</label>
-        <input
-          type="text"
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+        <label className="block mb-2 font-semibold">
+          Title
+          <input
+            type="text"
+            className="w-full border rounded p-2 mt-1"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </label>
 
-        {/* Handle */}
-        <label className="block mb-2 font-semibold">Handle (unique ID)</label>
-        <input
-          type="text"
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={handle}
-          onChange={(e) => setHandle(e.target.value)}
-          placeholder="Leave empty to auto-generate from title"
-        />
+        <label className="block mb-4 font-semibold">
+          Description
+          <DescriptionEditor value={description} onChange={setDescription} />
+        </label>
 
-        {/* Description */}
-        <label className="block mb-2 font-semibold">Description (HTML)</label>
-        <ReactQuill
-          theme="snow"
-          value={description}
-          onChange={setDescription}
-          className="mb-4"
-          modules={{
-            toolbar: [
-              [{ header: [1, 2, 3, false] }],
-              ['bold', 'italic', 'underline', 'strike'],
-              [{ list: 'ordered' }, { list: 'bullet' }],
-              ['link', 'image'],
-              ['clean'],
-            ],
-          }}
-        />
+        <label className="block mb-2 font-semibold">
+          Categories (comma separated)
+          <input
+            type="text"
+            className="w-full border rounded p-2 mt-1"
+            value={categories.join(', ')}
+            onChange={(e) => setCategories(e.target.value.split(',').map(c => c.trim()))}
+          />
+        </label>
 
-        {/* Categories / Collections */}
-        <label className="block mb-2 font-semibold">Categories / Collections</label>
-        <input
-          type="text"
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={categories.join(', ')}
-          onChange={(e) => setCategories(e.target.value.split(',').map((s) => s.trim()))}
-          placeholder="Comma separated"
-        />
+        <label className="block mb-4 font-semibold">
+          Tags (comma separated)
+          <input
+            type="text"
+            className="w-full border rounded p-2 mt-1"
+            value={tags.join(', ')}
+            onChange={(e) => setTags(e.target.value.split(',').map(t => t.trim()))}
+          />
+        </label>
 
-        {/* Tags */}
-        <label className="block mb-2 font-semibold">Tags</label>
-        <input
-          type="text"
-          className="w-full border rounded px-3 py-2 mb-4"
-          value={tags.join(', ')}
-          onChange={(e) => setTags(e.target.value.split(',').map((s) => s.trim()))}
-          placeholder="Comma separated"
-        />
+        <label className="block mb-4 font-semibold">
+          Images (URLs, comma separated)
+          <input
+            type="text"
+            className="w-full border rounded p-2 mt-1"
+            value={images.join(', ')}
+            onChange={(e) => setImages(e.target.value.split(',').map(i => i.trim()))}
+          />
+        </label>
 
-        {/* Images */}
-        <label className="block mb-2 font-semibold">Images URLs</label>
-        {images.map((img, i) => (
-          <div key={i} className="flex gap-2 mb-2">
-            <input
-              type="text"
-              className="flex-grow border rounded px-3 py-2"
-              value={img}
-              onChange={(e) => updateImage(i, e.target.value)}
-            />
-            <button
-              className="bg-red-600 text-white px-3 rounded"
-              onClick={() => removeImage(i)}
-            >
-              X
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={addImage}
-          className="mb-4 bg-green-600 text-white px-4 py-2 rounded shadow"
-        >
-          + Add Image
-        </button>
-
-        {/* Variants */}
-        <label className="block mb-2 font-semibold">Variants</label>
-        {variants.map((v, i) => (
-          <div key={v.id} className="border p-3 mb-3 rounded bg-gray-50">
-            <div className="flex flex-wrap gap-4 mb-2">
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold mb-2">Variants</h3>
+          {variants.length === 0 && <p className="text-gray-500">No variants added.</p>}
+          {variants.map((v, i) => (
+            <div key={i} className="border p-3 rounded mb-2 flex flex-wrap gap-2 items-center">
               <input
+                type="text"
                 placeholder="SKU"
                 value={v.sku}
-                onChange={(e) => updateVariant(i, 'sku', e.target.value)}
-                className="border rounded px-2 py-1 w-24"
+                onChange={(e) => handleVariantChange(i, 'sku', e.target.value)}
+                className="border rounded p-1 w-24"
               />
               <input
-                placeholder="Price"
+                type="text"
+                placeholder="Option 1"
+                value={v.option1}
+                onChange={(e) => handleVariantChange(i, 'option1', e.target.value)}
+                className="border rounded p-1 w-24"
+              />
+              <input
+                type="text"
+                placeholder="Option 2"
+                value={v.option2}
+                onChange={(e) => handleVariantChange(i, 'option2', e.target                value={v.option2}
+                onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
+                className="border rounded p-1 w-24"
+              />
+              <input
+                type="text"
+                placeholder="Option 3"
+                value={v.option3}
+                onChange={(e) => handleVariantChange(i, 'option3', e.target.value)}
+                className="border rounded p-1 w-24"
+              />
+              <input
+                type="text"
+                placeholder="Price (£)"
                 value={v.price}
-                onChange={(e) => updateVariant(i, 'price', e.target.value)}
-                className="border rounded px-2 py-1 w-24"
+                onChange={(e) => handleVariantChange(i, 'price', e.target.value)}
+                className="border rounded p-1 w-20"
               />
               <input
+                type="text"
                 placeholder="Barcode"
                 value={v.barcode}
-                onChange={(e) => updateVariant(i, 'barcode', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
+                onChange={(e) => handleVariantChange(i, 'barcode', e.target.value)}
+                className="border rounded p-1 w-28"
               />
               <input
-                placeholder="Inventory Qty"
                 type="number"
+                placeholder="Inventory"
                 value={v.inventory_quantity}
-                onChange={(e) => updateVariant(i, 'inventory_quantity', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
+                onChange={(e) => handleVariantChange(i, 'inventory_quantity', Number(e.target.value))}
+                className="border rounded p-1 w-20"
+                min={0}
               />
+              <button
+                onClick={() => handleRemoveVariant(i)}
+                className="text-red-600 hover:underline ml-2"
+                type="button"
+              >
+                Remove
+              </button>
             </div>
-            <div className="flex flex-wrap gap-4 mb-2">
-              <input
-                placeholder="Option 1 Name (e.g. Colour)"
-                value={v.option1_name}
-                onChange={(e) => updateVariant(i, 'option1_name', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-              <input
-                placeholder="Option 1 Value (e.g. Red)"
-                value={v.option1_value}
-                onChange={(e) => updateVariant(i, 'option1_value', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-              <input
-                placeholder="Option 2 Name"
-                value={v.option2_name}
-                onChange={(e) => updateVariant(i, 'option2_name', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-              <input
-                placeholder="Option 2 Value"
-                value={v.option2_value}
-                onChange={(e) => updateVariant(i, 'option2_value', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-              <input
-                placeholder="Option 3 Name"
-                value={v.option3_name}
-                onChange={(e) => updateVariant(i, 'option3_name', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-              <input
-                placeholder="Option 3 Value"
-                value={v.option3_value}
-                onChange={(e) => updateVariant(i, 'option3_value', e.target.value)}
-                className="border rounded px-2 py-1 w-32"
-              />
-            </div>
+          ))}
+
+          <div className="border p-3 rounded flex flex-wrap gap-2 items-center mt-4">
+            <input
+              type="text"
+              placeholder="SKU"
+              value={newVariant.sku}
+              onChange={(e) => setNewVariant({ ...newVariant, sku: e.target.value })}
+              className="border rounded p-1 w-24"
+            />
+            <input
+              type="text"
+              placeholder="Option 1"
+              value={newVariant.option1}
+              onChange={(e) => setNewVariant({ ...newVariant, option1: e.target.value })}
+              className="border rounded p-1 w-24"
+            />
+            <input
+              type="text"
+              placeholder="Option 2"
+              value={newVariant.option2}
+              onChange={(e) => setNewVariant({ ...newVariant, option2: e.target.value })}
+              className="border rounded p-1 w-24"
+            />
+            <input
+              type="text"
+              placeholder="Option 3"
+              value={newVariant.option3}
+              onChange={(e) => setNewVariant({ ...newVariant, option3: e.target.value })}
+              className="border rounded p-1 w-24"
+            />
+            <input
+              type="text"
+              placeholder="Price (£)"
+              value={newVariant.price}
+              onChange={(e) => setNewVariant({ ...newVariant, price: e.target.value })}
+              className="border rounded p-1 w-20"
+            />
+            <input
+              type="text"
+              placeholder="Barcode"
+              value={newVariant.barcode}
+              onChange={(e) => setNewVariant({ ...newVariant, barcode: e.target.value })}
+              className="border rounded p-1 w-28"
+            />
+            <input
+              type="number"
+              placeholder="Inventory"
+              value={newVariant.inventory_quantity}
+              onChange={(e) =>
+                setNewVariant({ ...newVariant, inventory_quantity: Number(e.target.value) })
+              }
+              className="border rounded p-1 w-20"
+              min={0}
+            />
             <button
-              onClick={() => removeVariant(i)}
-              className="bg-red-600 text-white px-3 rounded"
-              disabled={variants.length === 1}
-              title={variants.length === 1 ? 'At least one variant required' : 'Remove Variant'}
+              onClick={handleAddVariant}
+              className="bg-green-600 text-white px-3 py-1 rounded"
+              type="button"
             >
-              Remove Variant
+              Add Variant
             </button>
           </div>
-        ))}
-        <button
-          onClick={addVariant}
-          className="mb-4 bg-blue-600 text-white px-4 py-2 rounded shadow"
-        >
-          + Add Variant
-        </button>
+        </div>
 
-        {/* Actions */}
         <div className="flex justify-end gap-4">
           <button
             onClick={onCancel}
-            className="bg-gray-400 text-white px-4 py-2 rounded"
+            className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded"
+            type="button"
           >
             Cancel
           </button>
           <button
             onClick={handleSaveClick}
-            className="bg-green-600 text-white px-4 py-2 rounded"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+            type="button"
           >
             Save
           </button>
@@ -260,3 +255,4 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     </div>
   );
 }
+
