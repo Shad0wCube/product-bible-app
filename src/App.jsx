@@ -1,26 +1,33 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+} from 'react-router-dom';
+
 import ProductList from './components/ProductList';
 import ProductEditor from './components/ProductEditor';
-import ProductPage from './components/ProductPage';
+import ProductPage from './components/ProductPage'; // Make sure you have this component
 
-export default function AppWrapper() {
+export default function App() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  // Load from localStorage on mount
+  // Load products from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem('products');
     if (stored) setProducts(JSON.parse(stored));
   }, []);
 
-  // Save to localStorage on products change
+  // Save products to localStorage when they change
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
 
+  // Save or update product handler
   const handleSave = (product) => {
     if (!product.id) product.id = crypto.randomUUID();
+
     setProducts((prev) => {
       const exists = prev.find((p) => p.id === product.id);
       if (exists) {
@@ -29,17 +36,8 @@ export default function AppWrapper() {
         return [...prev, product];
       }
     });
+
     setSelected(null);
-  };
-
-  // Use handleDelete here and pass down
-  const handleDelete = (id) => {
-    const confirm1 = window.confirm('Are you sure you want to delete this product?');
-    if (!confirm1) return;
-    const confirm2 = window.confirm('This will permanently remove it. Confirm again?');
-    if (!confirm2) return;
-
-    setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
   return (
@@ -53,7 +51,6 @@ export default function AppWrapper() {
                 products={products}
                 setProducts={setProducts}
                 setSelected={setSelected}
-                handleDelete={handleDelete}  {/* Pass it here */}
               />
               {selected && (
                 <ProductEditor
@@ -65,7 +62,10 @@ export default function AppWrapper() {
             </>
           }
         />
-        <Route path="/product/:id" element={<ProductPage products={products} />} />
+        <Route
+          path="/product/:id"
+          element={<ProductPage products={products} />}
+        />
       </Routes>
     </Router>
   );
