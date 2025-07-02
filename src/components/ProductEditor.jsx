@@ -2,198 +2,172 @@ import React, { useState, useEffect, useRef } from 'react';
 
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
-  const [categories, setCategories] = useState((product.categories || []).join(', '));
-  const [images, setImages] = useState(product.images || []);
-  const [tags, setTags] = useState((product.tags || []).join(', '));
   const [description, setDescription] = useState(product.description || '');
-  const [tab, setTab] = useState('live'); // 'live' or 'code'
-  const liveRef = useRef(null);
+  const [categories, setCategories] = useState(product.categories || []);
+  const [images, setImages] = useState(product.images || []);
+  const [tags, setTags] = useState(product.tags || []);
+  const [editMode, setEditMode] = useState('live'); // 'live' or 'code'
+
+  const descriptionRef = useRef(null);
 
   useEffect(() => {
     setTitle(product.title || '');
-    setCategories((product.categories || []).join(', '));
-    setImages(product.images || []);
-    setTags((product.tags || []).join(', '));
     setDescription(product.description || '');
-    setTab('live');
+    setCategories(product.categories || []);
+    setImages(product.images || []);
+    setTags(product.tags || []);
   }, [product]);
 
-  const handleImagesChange = (e) => {
-    const urls = e.target.value
-      .split('\n')
-      .map((url) => url.trim())
-      .filter((url) => url.length);
-    setImages(urls);
-  };
-
-  const parseCSV = (str) => {
-    return str
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s.length);
-  };
-
-  const handleSaveClick = () => {
-    const updated = {
-      ...product,
-      title: title.trim(),
-      categories: parseCSV(categories),
-      images,
-      tags: parseCSV(tags),
-      description,
-    };
-    onSave(updated);
-  };
-
-  // Keyboard shortcut handler for live editor
+  // Cursor fix for Enter key in contentEditable (prevents cursor jump to start)
   const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      // Insert <br> at cursor position
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+
+      const range = sel.getRangeAt(0);
+      const br = document.createElement('br');
+      range.deleteContents();
+      range.insertNode(br);
+
+      // Move cursor after the <br>
+      range.setStartAfter(br);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    // Undo (Ctrl+Z) and Redo (Ctrl+Y)
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-      e.preventDefault();
       document.execCommand('undo');
-    } else if (
-      ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
-      ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')
-    ) {
       e.preventDefault();
+    } else if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || 
+               ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
       document.execCommand('redo');
+      e.preventDefault();
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-start overflow-auto z-50 p-6">
-      <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6">
-        <h2 className="text-2xl font-bold mb-4">{product.id ? 'Edit Product' : 'Add New Product'}</h2>
+  // Sync contentEditable div content with state
+  const handleDescriptionInput = (e) => {
+    setDescription(e.target.innerHTML);
+  };
 
-        <label className="block mb-3">
+  const handleSaveClick = () => {
+    onSave({
+      ...product,
+      title,
+      description,
+      categories,
+      images,
+      tags,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-start pt-10 z-50 overflow-auto">
+      <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full p-6 m-4">
+        <h2 className="text-2xl font-bold mb-4">
+          {product.id ? 'Edit Product' : 'Add Product'}
+        </h2>
+
+        {/* Title */}
+        <label className="block mb-4">
           <span className="font-semibold">Title</span>
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full mt-1 px-3 py-2 border rounded"
+            onChange={e => setTitle(e.target.value)}
+            className="w-full border rounded px-2 py-1 mt-1"
           />
         </label>
 
-        <label className="block mb-3">
-          <span className="font-semibold">Categories (comma separated)</span>
+        {/* Categories (comma separated) */}
+        <label className="block mb-4">
+          <span className="font-semibold">Categories</span>
           <input
             type="text"
-            value={categories}
-            onChange={(e) => setCategories(e.target.value)}
-            className="w-full mt-1 px-3 py-2 border rounded"
-            placeholder="e.g. Hardware, Bathroom, Kitchen"
+            value={categories.join(', ')}
+            onChange={e => setCategories(e.target.value.split(',').map(s => s.trim()))}
+            className="w-full border rounded px-2 py-1 mt-1"
+            placeholder="Comma separated categories"
           />
         </label>
 
-        <label className="block mb-3">
-          <span className="font-semibold">Tags (comma separated)</span>
+        {/* Tags (comma separated) */}
+        <label className="block mb-4">
+          <span className="font-semibold">Tags</span>
           <input
             type="text"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            className="w-full mt-1 px-3 py-2 border rounded"
-            placeholder="e.g. brass, metal, decorative"
+            value={tags.join(', ')}
+            onChange={e => setTags(e.target.value.split(',').map(s => s.trim()))}
+            className="w-full border rounded px-2 py-1 mt-1"
+            placeholder="Comma separated tags"
           />
         </label>
 
-        <label className="block mb-3">
-          <span className="font-semibold">Image URLs (one per line)</span>
-          <textarea
-            rows={4}
-            value={images.join('\n')}
-            onChange={handleImagesChange}
-            className="w-full mt-1 px-3 py-2 border rounded font-mono"
-            placeholder="https://example.com/image1.jpg"
+        {/* Images (comma separated URLs) */}
+        <label className="block mb-4">
+          <span className="font-semibold">Images URLs</span>
+          <input
+            type="text"
+            value={images.join(', ')}
+            onChange={e => setImages(e.target.value.split(',').map(s => s.trim()))}
+            className="w-full border rounded px-2 py-1 mt-1"
+            placeholder="Comma separated image URLs"
           />
         </label>
 
-        <div className="mb-3">
-          <div className="flex border-b border-gray-300 mb-1">
+        {/* Description with tabs for Code / Live */}
+        <div className="mb-4">
+          <div className="flex mb-2 border-b">
             <button
-              className={`px-4 py-2 -mb-px font-semibold border-b-2 ${
-                tab === 'live' ? 'border-blue-600 text-blue-600' : 'border-transparent'
-              }`}
-              onClick={() => setTab('live')}
+              onClick={() => setEditMode('live')}
+              className={`px-4 py-1 font-semibold ${editMode === 'live' ? 'border-b-2 border-blue-600' : 'text-gray-500'}`}
             >
-              Live Preview
+              Live View
             </button>
             <button
-              className={`px-4 py-2 -mb-px font-semibold border-b-2 ${
-                tab === 'code' ? 'border-blue-600 text-blue-600' : 'border-transparent'
-              }`}
-              onClick={() => setTab('code')}
+              onClick={() => setEditMode('code')}
+              className={`px-4 py-1 font-semibold ${editMode === 'code' ? 'border-b-2 border-blue-600' : 'text-gray-500'}`}
             >
               HTML Code
             </button>
           </div>
 
-          {tab === 'code' ? (
-            <textarea
-              rows={8}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded font-mono"
+          {editMode === 'live' ? (
+            <div
+              ref={descriptionRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleDescriptionInput}
+              onKeyDown={handleKeyDown}
+              className="border rounded p-3 min-h-[150px] overflow-auto prose max-w-none"
+              dangerouslySetInnerHTML={{ __html: description }}
+              spellCheck={true}
             />
           ) : (
-import React, { useState, useEffect, useRef } from 'react';
-
-export default function ProductEditor({ product, onSave, onCancel }) {
-  // ... your existing state hooks
-
-  const liveRef = useRef(null);
-  
-  // When description or tab changes, update live editor innerHTML only on tab switch or initial load
-  useEffect(() => {
-    if (tab === 'live' && liveRef.current) {
-      liveRef.current.innerHTML = description || '';
-    }
-  }, [tab, description]);
-
-  const handleInput = (e) => {
-    setDescription(e.currentTarget.innerHTML);
-  };
-
-  // ... rest of your code
-
-  return (
-    // ...
-    {tab === 'code' ? (
-      <textarea
-        rows={8}
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        className="w-full px-3 py-2 border rounded font-mono"
-      />
-    ) : (
-      <div
-        ref={liveRef}
-        className="border rounded p-3 min-h-[150px] overflow-auto"
-        contentEditable
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        style={{ whiteSpace: 'pre-wrap' }}
-        spellCheck={true}
-      />
-    )}
-    // ...
-  );
-}
-
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              className="w-full border rounded p-3 min-h-[150px] font-mono text-sm"
+            />
           )}
         </div>
 
-        <div className="flex justify-end gap-3">
+        {/* Buttons */}
+        <div className="flex justify-end gap-4">
           <button
             onClick={onCancel}
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
           >
             Cancel
           </button>
           <button
             onClick={handleSaveClick}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            disabled={!title.trim()}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
           >
             Save
           </button>
