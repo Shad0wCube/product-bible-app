@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css'; // Import Quill styles
+import 'react-quill/dist/quill.snow.css'; // Quill styles
 
 export default function ProductEditor({ product, onSave, onCancel }) {
   const [title, setTitle] = useState(product.title || '');
@@ -17,9 +17,6 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     setImages(product.images || []);
     setTags(product.tags || []);
   }, [product]);
-
-  // When switching from code -> live, parse HTML into ReactQuill
-  // When switching from live -> code, show raw HTML
 
   const handleSaveClick = () => {
     onSave({
