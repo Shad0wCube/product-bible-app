@@ -12,16 +12,16 @@ import ProductEditor from './components/ProductEditor';
 
 function ProductList({ products, setProducts, setSelected, handleDelete }) {
   const fileInputRef = useRef();
-  const [filterCollection, setFilterCollection] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
-  // Unique collections for filter dropdown
-  const allCollections = Array.from(
-    new Set(products.flatMap((p) => p.collections || []))
+  // Unique categories for filter dropdown
+  const allCategories = Array.from(
+    new Set(products.flatMap((p) => p.categories || []))
   ).sort();
 
-  // Filter products by selected collection
-  const filteredProducts = filterCollection
-    ? products.filter((p) => (p.collections || []).includes(filterCollection))
+  // Filter products by selected category
+  const filteredProducts = filterCategory
+    ? products.filter((p) => (p.categories || []).includes(filterCategory))
     : products;
 
   const handleImport = (e) => {
@@ -48,8 +48,7 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
               id: crypto.randomUUID(),
               title: row['Title'],
               description: row['Body (HTML)'] || '',
-              categories: row['Type'] ? [row['Type']] : [],
-              collections: row['Collection']
+              categories: row['Collection'] // Use Shopify 'Collection' as categories
                 ? row['Collection'].split(',').map((c) => c.trim())
                 : [],
               images: row['Image Src'] ? [row['Image Src']] : [],
@@ -62,7 +61,7 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
 
         setProducts(imported);
         fileInputRef.current.value = null;
-        setFilterCollection('');
+        setFilterCategory('');
       },
     });
   };
@@ -73,8 +72,7 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
         ID: p.id,
         Title: p.title,
         Description: p.description,
-        Categories: p.categories?.join(', '),
-        Collections: p.collections?.join(', '),
+        Collection: p.categories?.join(', '),  // Shopify uses "Collection"
         Images: p.images?.join(', '),
         Tags: p.tags?.join(', '),
         SKU: p.sku,
@@ -125,18 +123,18 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
         </div>
       </div>
 
-      {/* Filter by Collection */}
+      {/* Filter by Category */}
       <div className="mb-6">
-        <label className="mr-2 font-semibold">Filter by Collection:</label>
+        <label className="mr-2 font-semibold">Filter by Category:</label>
         <select
           className="border rounded px-2 py-1"
-          value={filterCollection}
-          onChange={(e) => setFilterCollection(e.target.value)}
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
         >
-          <option value="">-- All Collections --</option>
-          {allCollections.map((col) => (
-            <option key={col} value={col}>
-              {col}
+          <option value="">-- All Categories --</option>
+          {allCategories.map((cat) => (
+            <option key={cat} value={cat}>
+              {cat}
             </option>
           ))}
         </select>
@@ -169,8 +167,8 @@ function ProductList({ products, setProducts, setSelected, handleDelete }) {
                 </h2>
               </Link>
               <p className="text-sm text-gray-600 mb-1">
-                <strong>Collections: </strong>
-                {p.collections?.join(', ') || '—'}
+                <strong>Category: </strong>
+                {p.categories?.join(', ') || '—'}
               </p>
               <p className="text-sm text-gray-600 mb-1">
                 <strong>SKU:</strong> {p.sku || '—'}
@@ -242,13 +240,7 @@ function ProductPage({ products }) {
 
       {product.categories && product.categories.length > 0 && (
         <div className="mb-2">
-          <strong>Categories:</strong> {product.categories.join(', ')}
-        </div>
-      )}
-
-      {product.collections && product.collections.length > 0 && (
-        <div className="mb-2">
-          <strong>Collections:</strong> {product.collections.join(', ')}
+          <strong>Category:</strong> {product.categories.join(', ')}
         </div>
       )}
 
@@ -280,13 +272,11 @@ export default function AppWrapper() {
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  // Load from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('products');
     if (stored) setProducts(JSON.parse(stored));
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
