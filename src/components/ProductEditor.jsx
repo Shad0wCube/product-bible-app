@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import DescriptionEditor from './DescriptionEditor';
 
 export default function ProductEditor({ product, onSave, onCancel }) {
