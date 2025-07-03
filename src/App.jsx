@@ -9,12 +9,13 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import ProductEditor from './components/ProductEditor';
+import './App.css';
 
 function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
   const [filterCategory, setFilterCategory] = useState('');
   const [filterColour, setFilterColour] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [search, setSearch] = useState('');
 
   const categories = [...new Set(products.flatMap(p => p.categories || []))].sort();
   const colours = [...new Set(products.flatMap(p => p.tags || []).filter(t => /colour|color|colou?r/i.test(t)))].sort();
@@ -22,9 +23,12 @@ function ProductList({ products, setProducts, setSelected }) {
   const filteredProducts = products.filter(p => {
     const categoryMatch = !filterCategory || p.categories?.includes(filterCategory);
     const colourMatch = !filterColour || p.tags?.includes(filterColour);
-    const searchMatch = !searchTerm || [p.title, p.sku, p.barcode]
-      .filter(Boolean)
-      .some(val => val.toLowerCase().includes(searchTerm.toLowerCase()));
+    const searchMatch = !search ||
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.variants?.some(v =>
+        v.sku?.toLowerCase().includes(search.toLowerCase()) ||
+        v.barcode?.toLowerCase().includes(search.toLowerCase())
+      );
     return categoryMatch && colourMatch && searchMatch;
   });
 
@@ -42,40 +46,37 @@ function ProductList({ products, setProducts, setSelected }) {
           const handle = row['Handle'];
           if (!handle) return;
 
-if (!grouped[handle]) {
-  grouped[handle] = {
-    id: crypto.randomUUID(),
-    title: row['Title'],
-    description: row['Body (HTML)'] || '',
-    categories: row['Type'] ? [row['Type']] : [],
-    tags: row['Tags'] ? row['Tags'].split(',').map((t) => t.trim()) : [],
-    images: [],
-    variants: [],
-  };
-}
+          if (!grouped[handle]) {
+            grouped[handle] = {
+              id: crypto.randomUUID(),
+              title: row['Title'],
+              description: row['Body (HTML)'] || '',
+              categories: row['Type'] ? [row['Type']] : [],
+              tags: row['Tags'] ? row['Tags'].split(',').map((t) => t.trim()) : [],
+              images: [],
+              variants: [],
+            };
+          }
 
-const imageSrc = row['Image Src'];
-if (imageSrc && !grouped[handle].images.includes(imageSrc)) {
-  grouped[handle].images.push(imageSrc);
-}
+          const imageSrc = row['Image Src'];
+          if (imageSrc && !grouped[handle].images.includes(imageSrc)) {
+            grouped[handle].images.push(imageSrc);
+          }
 
-const variant = {
-  sku: row['Variant SKU'] || '',
-  option1: row['Option1 Value'] || '',
-  option2: row['Option2 Value'] || '',
-  option3: row['Option3 Value'] || '',
-  price: row['Variant Price'] || '',
-  quantity: row['Variant Inventory Qty'] || '',
-  barcode: row['Variant Barcode'] || '',
-};
+          const variant = {
+            sku: row['Variant SKU'] || '',
+            option1: row['Option1 Value'] || '',
+            option2: row['Option2 Value'] || '',
+            option3: row['Option3 Value'] || '',
+            price: row['Variant Price'] || '',
+            quantity: row['Variant Inventory Qty'] || '',
+            barcode: row['Variant Barcode'] || '',
+          };
 
-// Only push variant if there's at least 1 key field
-if (
-  variant.sku || variant.option1 || variant.option2 || variant.option3
-) {
-  grouped[handle].variants.push(variant);
-}
-
+          if (variant.sku || variant.option1 || variant.option2 || variant.option3) {
+            grouped[handle].variants.push(variant);
+          }
+        });
 
         setProducts(Object.values(grouped));
         fileInputRef.current.value = null;
@@ -100,6 +101,7 @@ if (
               'Option3 Value': v.option3,
               'Variant Price': v.price,
               'Variant Inventory Qty': v.quantity,
+              'Variant Barcode': v.barcode,
             }))
           : [
               {
@@ -115,6 +117,7 @@ if (
                 'Option3 Value': '',
                 'Variant Price': '',
                 'Variant Inventory Qty': '',
+                'Variant Barcode': '',
               },
             ];
       })
@@ -171,15 +174,14 @@ if (
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
+      <div className="flex gap-4 mb-4">
         <input
           type="text"
-          placeholder="Search title, SKU or barcode..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="border px-2 py-1 rounded w-full sm:w-72"
+          placeholder="Search by title, SKU, or barcode..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border px-2 py-1 rounded w-full sm:w-64"
         />
-
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
@@ -253,6 +255,7 @@ function ProductPage({ products }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const product = products.find((p) => p.id === id);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
 
   if (!product) {
     return (
@@ -279,15 +282,50 @@ function ProductPage({ products }) {
       <h1 className="text-3xl font-bold mb-4">{product.title}</h1>
 
       {product.images?.length > 0 && (
-        <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 gap-4">
           {product.images.map((src, i) => (
-            <img
-              key={i}
-              src={src}
-              alt={product.title}
-              className="rounded border"
-            />
+            <div key={i} className="relative group">
+              <img
+                src={src}
+                alt={product.title}
+                className="rounded border cursor-pointer hover:shadow-xl"
+                onClick={() => setFullscreenImage(src)}
+              />
+              <a
+                href={src}
+                download
+                className="absolute top-1 right-1 bg-white p-1 rounded shadow text-xs opacity-0 group-hover:opacity-100 transition"
+              >
+                ⬇
+              </a>
+            </div>
           ))}
+          {product.images.length > 1 && (
+            <button
+              onClick={() => {
+                product.images.forEach(src => {
+                  const link = document.createElement('a');
+                  link.href = src;
+                  link.download = src.split('/').pop();
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                });
+              }}
+              className="text-sm col-span-full text-right text-blue-600 hover:underline"
+            >
+              Download All Images
+            </button>
+          )}
+        </div>
+      )}
+
+      {fullscreenImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <img src={fullscreenImage} alt="Fullscreen" className="max-w-full max-h-full rounded" />
         </div>
       )}
 
