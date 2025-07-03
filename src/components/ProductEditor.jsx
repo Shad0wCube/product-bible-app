@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DescriptionEditor from './DescriptionEditor';
 
 export default function ProductEditor({ product, onSave, onCancel }) {
@@ -9,29 +9,24 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const [images, setImages] = useState(product.images || []);
   const [variants, setVariants] = useState(product.variants || []);
 
-  const [newVariant, setNewVariant] = useState({
-    sku: '',
-    option1: '',
-    option2: '',
-    option3: '',
-    price: '',
-    barcode: '',
-    inventory_quantity: 0,
-  });
+  const handleChange = (setter) => (e) => setter(e.target.value);
 
-  const handleAddVariant = () => {
-    if (!newVariant.sku) return alert('Variant SKU is required');
-    setVariants([...variants, newVariant]);
-    setNewVariant({
-      sku: '',
-      option1: '',
-      option2: '',
-      option3: '',
-      price: '',
-      barcode: '',
-      inventory_quantity: 0,
-    });
+  const handleTagChange = (e) => {
+    setTags(e.target.value.split(',').map((tag) => tag.trim()));
   };
+
+  const handleCategoryChange = (e) => {
+    setCategories(e.target.value.split(',').map((cat) => cat.trim()));
+  };
+
+  const handleImageChange = (index, value) => {
+    const newImages = [...images];
+    newImages[index] = value;
+    setImages(newImages);
+  };
+
+  const addImage = () => setImages([...images, '']);
+  const removeImage = (index) => setImages(images.filter((_, i) => i !== index));
 
   const handleVariantChange = (index, field, value) => {
     const newVariants = [...variants];
@@ -39,220 +34,163 @@ export default function ProductEditor({ product, onSave, onCancel }) {
     setVariants(newVariants);
   };
 
-  const handleRemoveVariant = (index) => {
-    if (!window.confirm('Are you sure you want to delete this variant?')) return;
-    setVariants(variants.filter((_, i) => i !== index));
-  };
+  const addVariant = () =>
+    setVariants([
+      ...variants,
+      {
+        sku: '',
+        option1: '',
+        option2: '',
+        option3: '',
+        price: '',
+        quantity: '',
+        barcode: '',
+      },
+    ]);
 
-  const handleSaveClick = () => {
-    onSave({
-      ...product,
-      title,
-      description,
-      categories,
-      tags,
-      images,
-      variants,
-    });
+  const removeVariant = (index) => setVariants(variants.filter((_, i) => i !== index));
+
+  const handleSubmit = () => {
+    onSave({ ...product, title, description, categories, tags, images, variants });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-start p-6 overflow-auto z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-4xl shadow-lg">
-        <h2 className="text-2xl font-bold mb-4">{product.id ? 'Edit Product' : 'Add Product'}</h2>
-
-        <label className="block mb-2 font-semibold">
-          Title
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded shadow max-w-4xl w-full overflow-y-auto max-h-[90vh]">
+        <h2 className="text-2xl font-bold mb-4">Edit Product</h2>
+        <div className="space-y-4">
           <input
             type="text"
-            className="w-full border rounded p-2 mt-1"
+            placeholder="Product Title"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={handleChange(setTitle)}
+            className="border px-2 py-1 rounded w-full"
           />
-        </label>
 
-        <label className="block mb-4 font-semibold">
-          Description
           <DescriptionEditor value={description} onChange={setDescription} />
-        </label>
 
-        <label className="block mb-2 font-semibold">
-          Categories (comma separated)
           <input
             type="text"
-            className="w-full border rounded p-2 mt-1"
+            placeholder="Categories (comma separated)"
             value={categories.join(', ')}
-            onChange={(e) => setCategories(e.target.value.split(',').map(c => c.trim()))}
+            onChange={handleCategoryChange}
+            className="border px-2 py-1 rounded w-full"
           />
-        </label>
 
-        <label className="block mb-4 font-semibold">
-          Tags (comma separated)
           <input
             type="text"
-            className="w-full border rounded p-2 mt-1"
+            placeholder="Tags (comma separated)"
             value={tags.join(', ')}
-            onChange={(e) => setTags(e.target.value.split(',').map(t => t.trim()))}
+            onChange={handleTagChange}
+            className="border px-2 py-1 rounded w-full"
           />
-        </label>
 
-        <label className="block mb-4 font-semibold">
-          Images (URLs, comma separated)
-          <input
-            type="text"
-            className="w-full border rounded p-2 mt-1"
-            value={images.join(', ')}
-            onChange={(e) => setImages(e.target.value.split(',').map(i => i.trim()))}
-          />
-        </label>
-
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold mb-2">Variants</h3>
-          {variants.length === 0 && <p className="text-gray-500">No variants added.</p>}
-          {variants.map((v, i) => (
-            <div key={i} className="border p-3 rounded mb-2 flex flex-wrap gap-2 items-center">
-              <input
-                type="text"
-                placeholder="SKU"
-                value={v.sku}
-                onChange={(e) => handleVariantChange(i, 'sku', e.target.value)}
-                className="border rounded p-1 w-24"
-              />
-              <input
-                type="text"
-                placeholder="Option 1"
-                value={v.option1}
-                onChange={(e) => handleVariantChange(i, 'option1', e.target.value)}
-                className="border rounded p-1 w-24"
-              />
-<input
-  type="text"
-  placeholder="Option 2"
-  value={v.option2}
-  onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
-  className="border rounded p-1 w-24"
-/>
-
-              <input
-                type="text"
-                placeholder="Option 3"
-                value={v.option3}
-                onChange={(e) => handleVariantChange(i, 'option3', e.target.value)}
-                className="border rounded p-1 w-24"
-              />
-              <input
-                type="text"
-                placeholder="Price (£)"
-                value={v.price}
-                onChange={(e) => handleVariantChange(i, 'price', e.target.value)}
-                className="border rounded p-1 w-20"
-              />
-              <input
-                type="text"
-                placeholder="Barcode"
-                value={v.barcode}
-                onChange={(e) => handleVariantChange(i, 'barcode', e.target.value)}
-                className="border rounded p-1 w-28"
-              />
-              <input
-                type="number"
-                placeholder="Inventory"
-                value={v.inventory_quantity}
-                onChange={(e) => handleVariantChange(i, 'inventory_quantity', Number(e.target.value))}
-                className="border rounded p-1 w-20"
-                min={0}
-              />
-              <button
-                onClick={() => handleRemoveVariant(i)}
-                className="text-red-600 hover:underline ml-2"
-                type="button"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-
-          <div className="border p-3 rounded flex flex-wrap gap-2 items-center mt-4">
-            <input
-              type="text"
-              placeholder="SKU"
-              value={newVariant.sku}
-              onChange={(e) => setNewVariant({ ...newVariant, sku: e.target.value })}
-              className="border rounded p-1 w-24"
-            />
-            <input
-              type="text"
-              placeholder="Option 1"
-              value={newVariant.option1}
-              onChange={(e) => setNewVariant({ ...newVariant, option1: e.target.value })}
-              className="border rounded p-1 w-24"
-            />
-            <input
-              type="text"
-              placeholder="Option 2"
-              value={newVariant.option2}
-              onChange={(e) => setNewVariant({ ...newVariant, option2: e.target.value })}
-              className="border rounded p-1 w-24"
-            />
-            <input
-              type="text"
-              placeholder="Option 3"
-              value={newVariant.option3}
-              onChange={(e) => setNewVariant({ ...newVariant, option3: e.target.value })}
-              className="border rounded p-1 w-24"
-            />
-            <input
-              type="text"
-              placeholder="Price (£)"
-              value={newVariant.price}
-              onChange={(e) => setNewVariant({ ...newVariant, price: e.target.value })}
-              className="border rounded p-1 w-20"
-            />
-            <input
-              type="text"
-              placeholder="Barcode"
-              value={newVariant.barcode}
-              onChange={(e) => setNewVariant({ ...newVariant, barcode: e.target.value })}
-              className="border rounded p-1 w-28"
-            />
-            <input
-              type="number"
-              placeholder="Inventory"
-              value={newVariant.inventory_quantity}
-              onChange={(e) =>
-                setNewVariant({ ...newVariant, inventory_quantity: Number(e.target.value) })
-              }
-              className="border rounded p-1 w-20"
-              min={0}
-            />
+          <div>
+            <label className="font-semibold">Images:</label>
+            {images.map((img, i) => (
+              <div key={i} className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  placeholder="Image URL"
+                  value={img}
+                  onChange={(e) => handleImageChange(i, e.target.value)}
+                  className="border px-2 py-1 rounded w-full"
+                />
+                <button
+                  onClick={() => removeImage(i)}
+                  className="text-red-600 hover:underline"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
             <button
-              onClick={handleAddVariant}
-              className="bg-green-600 text-white px-3 py-1 rounded"
-              type="button"
+              onClick={addImage}
+              className="mt-2 text-blue-600 hover:underline"
             >
-              Add Variant
+              + Add Image
             </button>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-4">
-          <button
-            onClick={onCancel}
-            className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded"
-            type="button"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSaveClick}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-            type="button"
-          >
-            Save
-          </button>
+          <div>
+            <label className="font-semibold">Variants:</label>
+            {variants.map((v, i) => (
+              <div key={i} className="border p-2 rounded mt-2 space-y-1">
+                <input
+                  type="text"
+                  placeholder="SKU"
+                  value={v.sku}
+                  onChange={(e) => handleVariantChange(i, 'sku', e.target.value)}
+                  className="border px-2 py-1 rounded w-full"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Option 1"
+                    value={v.option1}
+                    onChange={(e) => handleVariantChange(i, 'option1', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Option 2"
+                    value={v.option2}
+                    onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Option 3"
+                    value={v.option3}
+                    onChange={(e) => handleVariantChange(i, 'option3', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Price"
+                    value={v.price}
+                    onChange={(e) => handleVariantChange(i, 'price', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Quantity"
+                    value={v.quantity}
+                    onChange={(e) => handleVariantChange(i, 'quantity', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Barcode"
+                    value={v.barcode}
+                    onChange={(e) => handleVariantChange(i, 'barcode', e.target.value)}
+                    className="border rounded p-1 w-1/3"
+                  />
+                </div>
+                <button
+                  onClick={() => removeVariant(i)}
+                  className="text-red-600 hover:underline"
+                >
+                  Remove Variant
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={addVariant}
+              className="mt-2 text-blue-600 hover:underline"
+            >
+              + Add Variant
+            </button>
+          </div>
+
+          <div className="flex justify-end gap-4 mt-6">
+            <button onClick={onCancel} className="px-4 py-2 rounded bg-gray-300">Cancel</button>
+            <button onClick={handleSubmit} className="px-4 py-2 rounded bg-blue-600 text-white">Save</button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
