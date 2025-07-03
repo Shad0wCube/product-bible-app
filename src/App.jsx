@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import ProductEditor from './components/ProductEditor';
 
+// Utility: CSV to array of objects
 function csvToArray(str, delimiter = ',') {
   const headers = str.slice(0, str.indexOf('\n')).split(delimiter);
   const rows = str.slice(str.indexOf('\n') + 1).split('\n').filter(Boolean);
@@ -13,6 +15,7 @@ function csvToArray(str, delimiter = ',') {
   });
 }
 
+// Utility: array of objects to CSV string
 function arrayToCSV(arr, delimiter = ',') {
   if (!arr.length) return '';
   const headers = Object.keys(arr[0]);
@@ -23,6 +26,7 @@ function arrayToCSV(arr, delimiter = ',') {
   return csvRows.join('\n');
 }
 
+// Convert your products structure to Shopify CSV format rows
 function productsToShopifyCSV(products) {
   const rows = [];
 
@@ -123,14 +127,15 @@ function productsToShopifyCSV(products) {
   return rows;
 }
 
-
+// Convert CSV string to products array
 function parseCSVtoProducts(csvStr) {
   const arr = csvToArray(csvStr);
-  // Convert back to your products structure grouped by handle/title
   const productsMap = new Map();
 
   arr.forEach(row => {
     const handle = row.Handle;
+    if (!handle) return;
+
     if (!productsMap.has(handle)) {
       productsMap.set(handle, {
         id: Date.now().toString() + Math.random(),
@@ -141,23 +146,26 @@ function parseCSVtoProducts(csvStr) {
         variants: [],
       });
     }
+
     const product = productsMap.get(handle);
 
-    // Add image if not already present
+    // Add image if not duplicate
     if (row['Image Src'] && !product.images.includes(row['Image Src'])) {
       product.images.push(row['Image Src']);
     }
 
-    // Add variant
-    product.variants.push({
-      sku: row['Variant SKU'],
-      option1: row['Option1 Value'],
-      option2: row['Option2 Value'],
-      option3: row['Option3 Value'],
-      price: row['Variant Price'],
-      quantity: row['Variant Inventory Qty'],
-      barcode: row['Variant Barcode'],
-    });
+    // Add variant if SKU present
+    if (row['Variant SKU']) {
+      product.variants.push({
+        sku: row['Variant SKU'],
+        option1: row['Option1 Value'],
+        option2: row['Option2 Value'],
+        option3: row['Option3 Value'],
+        price: row['Variant Price'],
+        quantity: row['Variant Inventory Qty'],
+        barcode: row['Variant Barcode'],
+      });
+    }
   });
 
   return Array.from(productsMap.values());
@@ -172,6 +180,10 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [exportFormat, setExportFormat] = useState('json');
+
+  // Import preview and modal toggle
+  const [importPreview, setImportPreview] = useState([]);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
@@ -206,71 +218,96 @@ export default function App() {
     }
   };
 
-const handleImportCSV = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+  // Combined import handler for JSON, CSV, XLSX with preview
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const text = event.target.result;
-    const [headerLine, ...lines] = text.trim().split('\n');
-    const headers = headerLine.split(',');
+    const reader = new FileReader();
+    const fileExt = file.name.split('.').pop().toLowerCase();
 
-    const handleIndex = headers.indexOf('Handle');
-    const titleIndex = headers.indexOf('Title');
-    const bodyIndex = headers.indexOf('Body (HTML)');
-    const skuIndex = headers.indexOf('Variant SKU');
-    const priceIndex = headers.indexOf('Variant Price');
-    const qtyIndex = headers.indexOf('Variant Inventory Qty');
-    const barcodeIndex = headers.indexOf('Variant Barcode');
-    const option1Index = headers.indexOf('Option1 Value');
-    const option2Index = headers.indexOf('Option2 Value');
-    const option3Index = headers.indexOf('Option3 Value');
-    const imageIndex = headers.indexOf('Image Src');
+    reader.onload = (event) => {
+      let parsed = [];
 
-    const productMap = {};
-
-    for (const line of lines) {
-      const fields = line.split(',');
-
-      const handle = fields[handleIndex];
-      if (!handle) continue;
-
-      if (!productMap[handle]) {
-        productMap[handle] = {
-          id: Date.now().toString() + Math.random(),
-          title: fields[titleIndex] || '',
-          description: fields[bodyIndex] || '',
-          variants: [],
-          images: [],
-        };
+      try {
+        if (fileExt === 'json') {
+          const json = JSON.parse(event.target.result);
+          if (Array.isArray(json)) parsed = json;
+          else alert('Invalid JSON format: must be an array of products.');
+        } else if (fileExt === 'csv') {
+          parsed = parseCSVtoProducts(event.target.result);
+        } else if (fileExt === 'xlsx') {
+          const workbook = XLSX.read(event.target.result, { type: 'binary' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          const csv = XLSX.utils.sheet_to_csv(sheet);
+          parsed = parseCSVtoProducts(csv);
+        } else {
+          alert('Unsupported file type.');
+          return;
+        }
+      } catch (err) {
+        alert('Failed to parse file: ' + err.message);
+        return;
       }
 
-      const sku = fields[skuIndex]?.trim();
-      if (!sku) continue; // Skip if no SKU
-
-      productMap[handle].variants.push({
-        sku,
-        price: fields[priceIndex] || '',
-        quantity: fields[qtyIndex] || '',
-        barcode: fields[barcodeIndex] || '',
-        option1: fields[option1Index] || '',
-        option2: fields[option2Index] || '',
-        option3: fields[option3Index] || '',
-      });
-
-      const image = fields[imageIndex];
-      if (image && !productMap[handle].images.includes(image)) {
-        productMap[handle].images.push(image);
+      if (parsed.length) {
+        setImportPreview(parsed);
+        setShowPreview(true);
+      } else {
+        alert('No valid products found in import.');
       }
+    };
+
+    if (fileExt === 'xlsx') {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
     }
-
-    setProducts(Object.values(productMap));
   };
 
-  reader.readAsText(file);
-};
+  // Confirm import: replace current products with preview
+  const confirmImport = () => {
+    setProducts(importPreview);
+    setImportPreview([]);
+    setShowPreview(false);
+  };
 
+  // Export handler for JSON, CSV, XLSX
+  const handleExport = () => {
+    if (exportFormat === 'json') {
+      const dataStr = JSON.stringify(products, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'products-export.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (exportFormat === 'csv') {
+      const csvRows = productsToShopifyCSV(products);
+      const csvStr = arrayToCSV(csvRows);
+      const blob = new Blob([csvStr], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'products-export.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (exportFormat === 'xlsx') {
+      const csvRows = productsToShopifyCSV(products);
+      const ws = XLSX.utils.json_to_sheet(csvRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Products');
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'products-export.xlsx';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -278,7 +315,9 @@ const handleImportCSV = (e) => {
 
       <div className="flex gap-4 mb-4">
         <button
-          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })}
+          onClick={() =>
+            setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })
+          }
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Add Product
@@ -290,8 +329,9 @@ const handleImportCSV = (e) => {
             onChange={(e) => setExportFormat(e.target.value)}
             className="border rounded px-2 py-1 mr-2"
           >
-            <option value="json">Export JSON</option>
-            <option value="csv">Export CSV</option>
+            <option value="json">JSON</option>
+            <option value="csv">CSV</option>
+            <option value="xlsx">XLSX</option>
           </select>
           <button
             onClick={handleExport}
@@ -302,10 +342,10 @@ const handleImportCSV = (e) => {
         </div>
 
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
-          Import JSON or CSV
+          Import File
           <input
             type="file"
-            accept=".json,.csv"
+            accept=".json,.csv,.xlsx"
             onChange={handleImport}
             className="hidden"
           />
@@ -320,9 +360,7 @@ const handleImportCSV = (e) => {
         />
       </div>
 
-      {filteredProducts.length === 0 && (
-        <p>No products found.</p>
-      )}
+      {filteredProducts.length === 0 && <p>No products found.</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProducts.map((product) => (
@@ -346,35 +384,4 @@ const handleImportCSV = (e) => {
                   <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
                   <p><strong>Price:</strong> {variant.price || '-'}</p>
                   <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
-                  <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setEditingProduct(product)}
-                className="bg-yellow-500 text-white px-3 py-1 rounded"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDeleteProduct(product.id)}
-                className="bg-red-600 text-white px-3 py-1 rounded"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {editingProduct && (
-        <ProductEditor
-          product={editingProduct}
-          onSave={handleSaveProduct}
-          onCancel={() => setEditingProduct(null)}
-        />
-      )}
-    </div>
-  );
-}
+                  <p><strong>Barcode:</strong> {variant
