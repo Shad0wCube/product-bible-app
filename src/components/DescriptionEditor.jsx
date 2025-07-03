@@ -16,7 +16,7 @@ export default function DescriptionEditor({ value, onChange }) {
     if (mode === 'live') {
       onChange(code);
     }
-  }, [mode]); // Only trigger on mode change
+  }, [mode, code, onChange]); // <-- Added code and onChange here
 
   const modules = {
     toolbar: [
