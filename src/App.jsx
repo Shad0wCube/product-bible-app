@@ -24,8 +24,6 @@ function arrayToCSV(arr, delimiter = ',') {
 }
 
 function productsToShopifyCSV(products) {
-  // Flatten products and variants into Shopify CSV format
-  // Simplified example mapping some key fields only; extend as needed
   const rows = [];
 
   products.forEach(product => {
@@ -34,9 +32,9 @@ function productsToShopifyCSV(products) {
         Handle: product.title.toLowerCase().replace(/\s+/g, '-'),
         Title: product.title,
         'Body (HTML)': product.description || '',
-        Vendor: '', // add if you have vendor
-        'Product Category': '', // add if needed
-        Type: '', // add if needed
+        Vendor: '',
+        'Product Category': '',
+        Type: '',
         Tags: (product.tags || []).join(', '),
         Published: 'TRUE',
         'Option1 Name': 'Option1',
@@ -62,7 +60,7 @@ function productsToShopifyCSV(products) {
         'Image Src': product.images[i] || '',
         'Image Position': i + 1,
         'Image Alt Text': product.title,
-        Gift Card: 'FALSE',
+        'Gift Card': 'FALSE',
         'SEO Title': '',
         'SEO Description': '',
         'Google Shopping / Google Product Category': '',
@@ -124,6 +122,7 @@ function productsToShopifyCSV(products) {
 
   return rows;
 }
+
 
 function parseCSVtoProducts(csvStr) {
   const arr = csvToArray(csvStr);
