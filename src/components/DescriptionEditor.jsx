@@ -1,54 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
 export default function DescriptionEditor({ value, onChange }) {
   const [mode, setMode] = useState('rich'); // 'rich' or 'code'
-  const quillRef = useRef(null);
-  const textareaRef = useRef(null);
-
-  // Keyboard shortcuts handler for both editors
-  useEffect(() => {
-    function handleKeyDown(e) {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
-
-      if (!ctrlKey) return;
-
-      // Undo (Ctrl+Z / Cmd+Z)
-      if (e.key === 'z' || e.key === 'Z') {
-        e.preventDefault();
-        if (mode === 'rich') {
-          quillRef.current.getEditor().history.undo();
-        } else {
-          // For textarea, browser default undo works
-          // no need to override
-        }
-      }
-
-      // Redo (Ctrl+Y / Cmd+Shift+Z)
-      if (e.key === 'y' || (e.key === 'Z' && e.shiftKey)) {
-        e.preventDefault();
-        if (mode === 'rich') {
-          quillRef.current.getEditor().history.redo();
-        } else {
-          // browser default redo
-        }
-      }
-    }
-
-    const editor = mode === 'rich' ? quillRef.current?.getEditor() : textareaRef.current;
-
-    if (editor) {
-      editor.root ? editor.root.addEventListener('keydown', handleKeyDown) : editor.addEventListener('keydown', handleKeyDown);
-    }
-
-    return () => {
-      if (editor) {
-        editor.root ? editor.root.removeEventListener('keydown', handleKeyDown) : editor.removeEventListener('keydown', handleKeyDown);
-      }
-    };
-  }, [mode]);
 
   return (
     <div>
@@ -71,7 +26,6 @@ export default function DescriptionEditor({ value, onChange }) {
 
       {mode === 'rich' ? (
         <ReactQuill
-          ref={quillRef}
           theme="snow"
           value={value}
           onChange={onChange}
@@ -83,11 +37,6 @@ export default function DescriptionEditor({ value, onChange }) {
               ['link', 'image'],
               ['clean'],
             ],
-            history: {
-              delay: 2000,
-              maxStack: 100,
-              userOnly: true,
-            },
           }}
           formats={[
             'header',
@@ -99,7 +48,6 @@ export default function DescriptionEditor({ value, onChange }) {
         />
       ) : (
         <textarea
-          ref={textareaRef}
           className="w-full h-64 border border-gray-300 rounded p-2 font-mono text-sm"
           value={value}
           onChange={(e) => onChange(e.target.value)}
