@@ -14,6 +14,7 @@ function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
   const [filterCategory, setFilterCategory] = useState('');
   const [filterColour, setFilterColour] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const categories = [...new Set(products.flatMap(p => p.categories || []))].sort();
   const colours = [...new Set(products.flatMap(p => p.tags || []).filter(t => /colour|color|colou?r/i.test(t)))].sort();
@@ -21,7 +22,10 @@ function ProductList({ products, setProducts, setSelected }) {
   const filteredProducts = products.filter(p => {
     const categoryMatch = !filterCategory || p.categories?.includes(filterCategory);
     const colourMatch = !filterColour || p.tags?.includes(filterColour);
-    return categoryMatch && colourMatch;
+    const searchMatch = !searchTerm || [p.title, p.sku, p.barcode]
+      .filter(Boolean)
+      .some(val => val.toLowerCase().includes(searchTerm.toLowerCase()));
+    return categoryMatch && colourMatch && searchMatch;
   });
 
   const handleImport = (e) => {
@@ -159,6 +163,14 @@ function ProductList({ products, setProducts, setSelected }) {
       </div>
 
       <div className="flex gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Search title, SKU or barcode..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border px-2 py-1 rounded w-full sm:w-72"
+        />
+
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
