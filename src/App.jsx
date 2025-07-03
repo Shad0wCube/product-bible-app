@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ProductEditor from './components/ProductEditor';
-import Papa from 'papaparse';
 
 export default function App() {
   const [products, setProducts] = useState(() => {
@@ -74,8 +73,15 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  // Export CSV compatible with Shopify import rules
   const handleExportCSV = () => {
+    if (products.length === 0) {
+      alert('No products to export.');
+      return;
+    }
+
     const rows = [];
+
     products.forEach((product) => {
       product.variants.forEach((variant, index) => {
         rows.push({
@@ -86,17 +92,31 @@ export default function App() {
           Option1: variant.option1,
           Option2: variant.option2,
           Option3: variant.option3,
-          Variant SKU: variant.sku,
-          Variant Price: variant.price,
-          Variant Inventory Qty: variant.quantity,
-          Variant Barcode: variant.barcode,
-          Image Src: product.images[index] || '',
+          "Variant SKU": variant.sku,
+          "Variant Price": variant.price,
+          "Variant Inventory Qty": variant.quantity,
+          "Variant Barcode": variant.barcode,
+          "Image Src": product.images[index] || '',
         });
       });
     });
 
-    const csv = Papa.unparse(rows);
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const headers = Object.keys(rows[0]);
+    const csvContent =
+      headers.join(',') +
+      '\n' +
+      rows
+        .map((row) =>
+          headers
+            .map((field) => {
+              const escaped = (row[field] ?? '').toString().replace(/"/g, '""');
+              return `"${escaped}"`;
+            })
+            .join(',')
+        )
+        .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -105,55 +125,81 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  // Import CSV (basic implementation, assumes header row matches export format)
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: ({ data }) => {
-        const grouped = {};
-        data.forEach((row) => {
-          const id = row.Handle || Date.now().toString();
-          if (!grouped[id]) {
-            grouped[id] = {
-              id,
-              title: row.Title || '',
-              description: row.Body || '',
-              tags: row.Tags ? row.Tags.split(',').map((t) => t.trim()) : [],
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target.result;
+      try {
+        const lines = text.split('\n').filter((line) => line.trim() !== '');
+        const headers = lines[0].split(',').map((h) => h.replace(/(^"|"$)/g, '').trim());
+
+        const importedProducts = {};
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // CSV split respecting quotes
+          const obj = {};
+          headers.forEach((header, idx) => {
+            obj[header] = row[idx]?.replace(/(^"|"$)/g, '') || '';
+          });
+
+          const handle = obj['Handle'] || `product-${i}`;
+          if (!importedProducts[handle]) {
+            importedProducts[handle] = {
+              id: handle,
+              title: obj['Title'],
+              description: obj['Body'],
+              tags: obj['Tags'] ? obj['Tags'].split(',').map((t) => t.trim()) : [],
               images: [],
               variants: [],
-              categories: [],
             };
           }
 
-          grouped[id].variants.push({
-            sku: row['Variant SKU'],
-            option1: row['Option1'],
-            option2: row['Option2'],
-            option3: row['Option3'],
-            price: row['Variant Price'],
-            quantity: row['Variant Inventory Qty'],
-            barcode: row['Variant Barcode'],
+          // Add variant
+          importedProducts[handle].variants.push({
+            option1: obj['Option1'],
+            option2: obj['Option2'],
+            option3: obj['Option3'],
+            sku: obj['Variant SKU'],
+            price: obj['Variant Price'],
+            quantity: obj['Variant Inventory Qty'],
+            barcode: obj['Variant Barcode'],
           });
 
-          if (row['Image Src']) {
-            grouped[id].images.push(row['Image Src']);
+          // Add image if present and not duplicate
+          const img = obj['Image Src'];
+          if (img && !importedProducts[handle].images.includes(img)) {
+            importedProducts[handle].images.push(img);
           }
-        });
+        }
 
-        setProducts(Object.values(grouped));
-      },
-    });
+        setProducts(Object.values(importedProducts));
+      } catch (err) {
+        alert('Failed to parse CSV.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-4xl font-bold mb-6">Product Bible</h1>
 
-      <div className="flex gap-4 mb-4 flex-wrap">
+      <div className="flex gap-4 mb-4">
         <button
-          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })}
+          onClick={() =>
+            setEditingProduct({
+              id: null,
+              title: '',
+              variants: [],
+              images: [],
+              description: '',
+              categories: [],
+              tags: [],
+            })
+          }
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Add Product
@@ -166,13 +212,6 @@ export default function App() {
           Export JSON
         </button>
 
-        <button
-          onClick={handleExportCSV}
-          className="bg-green-700 text-white px-4 py-2 rounded"
-        >
-          Export CSV
-        </button>
-
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
           Import JSON
           <input
@@ -182,6 +221,13 @@ export default function App() {
             className="hidden"
           />
         </label>
+
+        <button
+          onClick={handleExportCSV}
+          className="bg-green-700 text-white px-4 py-2 rounded"
+        >
+          Export CSV
+        </button>
 
         <label className="bg-gray-400 px-4 py-2 rounded cursor-pointer">
           Import CSV
@@ -202,9 +248,7 @@ export default function App() {
         />
       </div>
 
-      {filteredProducts.length === 0 && (
-        <p>No products found.</p>
-      )}
+      {filteredProducts.length === 0 && <p>No products found.</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProducts.map((product) => (
@@ -215,7 +259,7 @@ export default function App() {
                 <img
                   key={i}
                   src={src}
-                  alt={`Image ${i + 1}`}
+                  alt={`${product.title} ${i + 1}`}
                   className="w-20 h-20 object-cover rounded cursor-pointer"
                   onClick={() => window.open(src, '_blank')}
                 />
@@ -224,11 +268,23 @@ export default function App() {
             <div className="grid grid-cols-3 gap-2">
               {product.variants.map((variant, i) => (
                 <div key={i} className="border rounded p-2 bg-gray-50">
-                  <p><strong>SKU:</strong> {variant.sku || '-'}</p>
-                  <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
-                  <p><strong>Price:</strong> {variant.price || '-'}</p>
-                  <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
-                  <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
+                  <p>
+                    <strong>SKU:</strong> {variant.sku || '-'}
+                  </p>
+                  <p>
+                    <strong>Options:</strong> {variant.option1 || ''}{' '}
+                    {variant.option2 ? `/ ${variant.option2}` : ''}{' '}
+                    {variant.option3 ? `/ ${variant.option3}` : ''}
+                  </p>
+                  <p>
+                    <strong>Price:</strong> {variant.price || '-'}
+                  </p>
+                  <p>
+                    <strong>Quantity:</strong> {variant.quantity || '-'}
+                  </p>
+                  <p>
+                    <strong>Barcode:</strong> {variant.barcode || '-'}
+                  </p>
                 </div>
               ))}
             </div>
