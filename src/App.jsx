@@ -1,4 +1,4 @@
-""import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Papa from 'papaparse';
 import {
   BrowserRouter as Router,
@@ -12,6 +12,17 @@ import ProductEditor from './components/ProductEditor';
 
 function ProductList({ products, setProducts, setSelected }) {
   const fileInputRef = useRef();
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterColour, setFilterColour] = useState('');
+
+  const categories = [...new Set(products.flatMap(p => p.categories || []))].sort();
+  const colours = [...new Set(products.flatMap(p => p.tags || []).filter(t => /colour|color|colou?r/i.test(t)))].sort();
+
+  const filteredProducts = products.filter(p => {
+    const categoryMatch = !filterCategory || p.categories?.includes(filterCategory);
+    const colourMatch = !filterColour || p.tags?.includes(filterColour);
+    return categoryMatch && colourMatch;
+  });
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -147,8 +158,32 @@ function ProductList({ products, setProducts, setSelected }) {
         </div>
       </div>
 
+      <div className="flex gap-4 mb-6">
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className="border px-2 py-1 rounded"
+        >
+          <option value="">All Categories</option>
+          {categories.map((cat) => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+
+        <select
+          value={filterColour}
+          onChange={(e) => setFilterColour(e.target.value)}
+          className="border px-2 py-1 rounded"
+        >
+          <option value="">All Colours</option>
+          {colours.map((col) => (
+            <option key={col} value={col}>{col}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {products.map((p) => (
+        {filteredProducts.map((p) => (
           <div
             key={p.id}
             className="border rounded-lg shadow hover:shadow-lg transition overflow-hidden bg-white"
