@@ -42,31 +42,40 @@ function ProductList({ products, setProducts, setSelected }) {
           const handle = row['Handle'];
           if (!handle) return;
 
-          if (!grouped[handle]) {
-            grouped[handle] = {
-              id: crypto.randomUUID(),
-              title: row['Title'],
-              description: row['Body (HTML)'] || '',
-              categories: row['Type'] ? [row['Type']] : [],
-              tags: row['Tags'] ? row['Tags'].split(',').map((t) => t.trim()) : [],
-              images: [],
-              variants: [],
-            };
-          }
+if (!grouped[handle]) {
+  grouped[handle] = {
+    id: crypto.randomUUID(),
+    title: row['Title'],
+    description: row['Body (HTML)'] || '',
+    categories: row['Type'] ? [row['Type']] : [],
+    tags: row['Tags'] ? row['Tags'].split(',').map((t) => t.trim()) : [],
+    images: [],
+    variants: [],
+  };
+}
 
-          if (row['Image Src'] && !grouped[handle].images.includes(row['Image Src'])) {
-            grouped[handle].images.push(row['Image Src']);
-          }
+const imageSrc = row['Image Src'];
+if (imageSrc && !grouped[handle].images.includes(imageSrc)) {
+  grouped[handle].images.push(imageSrc);
+}
 
-          grouped[handle].variants.push({
-            sku: row['Variant SKU'],
-            option1: row['Option1 Value'],
-            option2: row['Option2 Value'],
-            option3: row['Option3 Value'],
-            price: row['Variant Price'],
-            quantity: row['Variant Inventory Qty'],
-          });
-        });
+const variant = {
+  sku: row['Variant SKU'] || '',
+  option1: row['Option1 Value'] || '',
+  option2: row['Option2 Value'] || '',
+  option3: row['Option3 Value'] || '',
+  price: row['Variant Price'] || '',
+  quantity: row['Variant Inventory Qty'] || '',
+  barcode: row['Variant Barcode'] || '',
+};
+
+// Only push variant if there's at least 1 key field
+if (
+  variant.sku || variant.option1 || variant.option2 || variant.option3
+) {
+  grouped[handle].variants.push(variant);
+}
+
 
         setProducts(Object.values(grouped));
         fileInputRef.current.value = null;
