@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import ProductEditor from './components/ProductEditor';
+import './index.css';
+
 
 export default function App() {
   const [products, setProducts] = useState([
