@@ -14,7 +14,7 @@ export default function ProductView({ product }) {
             <img
               key={i}
               src={img}
-              alt={`${title} image ${i + 1}`}
+              alt={product.title || 'product'}
               className="w-32 h-32 object-cover rounded border"
             />
           ))
