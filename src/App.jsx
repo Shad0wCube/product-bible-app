@@ -206,60 +206,71 @@ export default function App() {
     }
   };
 
-  const handleExport = () => {
-    if (exportFormat === 'json') {
-      const dataStr = JSON.stringify(products, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-export.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (exportFormat === 'csv') {
-      const csvData = productsToShopifyCSV(products);
-      const csvStr = arrayToCSV(csvData);
-      const blob = new Blob([csvStr], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-export.csv';
-      a.click();
-      URL.revokeObjectURL(url);
+const handleImportCSV = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const text = event.target.result;
+    const [headerLine, ...lines] = text.trim().split('\n');
+    const headers = headerLine.split(',');
+
+    const handleIndex = headers.indexOf('Handle');
+    const titleIndex = headers.indexOf('Title');
+    const bodyIndex = headers.indexOf('Body (HTML)');
+    const skuIndex = headers.indexOf('Variant SKU');
+    const priceIndex = headers.indexOf('Variant Price');
+    const qtyIndex = headers.indexOf('Variant Inventory Qty');
+    const barcodeIndex = headers.indexOf('Variant Barcode');
+    const option1Index = headers.indexOf('Option1 Value');
+    const option2Index = headers.indexOf('Option2 Value');
+    const option3Index = headers.indexOf('Option3 Value');
+    const imageIndex = headers.indexOf('Image Src');
+
+    const productMap = {};
+
+    for (const line of lines) {
+      const fields = line.split(',');
+
+      const handle = fields[handleIndex];
+      if (!handle) continue;
+
+      if (!productMap[handle]) {
+        productMap[handle] = {
+          id: Date.now().toString() + Math.random(),
+          title: fields[titleIndex] || '',
+          description: fields[bodyIndex] || '',
+          variants: [],
+          images: [],
+        };
+      }
+
+      const sku = fields[skuIndex]?.trim();
+      if (!sku) continue; // Skip if no SKU
+
+      productMap[handle].variants.push({
+        sku,
+        price: fields[priceIndex] || '',
+        quantity: fields[qtyIndex] || '',
+        barcode: fields[barcodeIndex] || '',
+        option1: fields[option1Index] || '',
+        option2: fields[option2Index] || '',
+        option3: fields[option3Index] || '',
+      });
+
+      const image = fields[imageIndex];
+      if (image && !productMap[handle].images.includes(image)) {
+        productMap[handle].images.push(image);
+      }
     }
+
+    setProducts(Object.values(productMap));
   };
 
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const text = ev.target.result;
-      if (file.name.endsWith('.json')) {
-        try {
-          const imported = JSON.parse(text);
-          if (Array.isArray(imported)) {
-            setProducts(imported);
-          } else {
-            alert('Invalid JSON file.');
-          }
-        } catch {
-          alert('Failed to parse JSON.');
-        }
-      } else if (file.name.endsWith('.csv')) {
-        try {
-          const imported = parseCSVtoProducts(text);
-          setProducts(imported);
-        } catch {
-          alert('Failed to parse CSV.');
-        }
-      } else {
-        alert('Unsupported file type.');
-      }
-      e.target.value = null; // reset file input so same file can be reselected
-    };
-    reader.readAsText(file);
-  };
+  reader.readAsText(file);
+};
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
