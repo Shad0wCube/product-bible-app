@@ -126,12 +126,11 @@ function productsToShopifyCSV(products) {
 
 function parseCSVtoProducts(csvStr) {
   const arr = csvToArray(csvStr);
+  // Convert back to your products structure grouped by handle/title
   const productsMap = new Map();
 
   arr.forEach(row => {
     const handle = row.Handle;
-    if (!handle) return;
-
     if (!productsMap.has(handle)) {
       productsMap.set(handle, {
         id: Date.now().toString() + Math.random(),
@@ -144,11 +143,12 @@ function parseCSVtoProducts(csvStr) {
     }
     const product = productsMap.get(handle);
 
+    // Add image if not already present
     if (row['Image Src'] && !product.images.includes(row['Image Src'])) {
       product.images.push(row['Image Src']);
     }
 
-    // Skip blank SKU variants
+    // Add variant
     if (row['Variant SKU']?.trim()) {
       product.variants.push({
         sku: row['Variant SKU'],
@@ -165,10 +165,12 @@ function parseCSVtoProducts(csvStr) {
   return Array.from(productsMap.values());
 }
 
-function parseXLSXtoProducts(data) {
-  const workbook = XLSX.read(data, { type: 'binary' });
-  const firstSheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[firstSheetName];
+function parseXLSXtoProducts(fileData) {
+  const workbook = XLSX.read(fileData, { type: 'binary' });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  // Use the CSV parser logic on JSON converted to CSV string:
   const csvStr = XLSX.utils.sheet_to_csv(sheet);
   return parseCSVtoProducts(csvStr);
 }
@@ -178,11 +180,13 @@ export default function App() {
     const saved = localStorage.getItem('products');
     return saved ? JSON.parse(saved) : [];
   });
-
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [exportFormat, setExportFormat] = useState('json');
-  const [importPreview, setImportPreview] = useState(null);
+
+  // For import preview
+  const [importPreviewProducts, setImportPreviewProducts] = useState(null);
+  const [showImportPreview, setShowImportPreview] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
@@ -217,77 +221,88 @@ export default function App() {
     }
   };
 
+  // Combined import handler for JSON, CSV, XLSX with preview
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target.result;
-      let importedProducts = [];
 
-      if (file.name.endsWith('.json')) {
-        try {
-          importedProducts = JSON.parse(result);
-        } catch {
-          alert('Invalid JSON file');
+    const fileExt = file.name.split('.').pop().toLowerCase();
+
+    reader.onload = (event) => {
+      try {
+        let importedProducts = [];
+
+        if (fileExt === 'json') {
+          importedProducts = JSON.parse(event.target.result);
+        } else if (fileExt === 'csv') {
+          importedProducts = parseCSVtoProducts(event.target.result);
+        } else if (fileExt === 'xlsx') {
+          importedProducts = parseXLSXtoProducts(event.target.result);
+        } else {
+          alert('Unsupported file type.');
           return;
         }
-      } else if (file.name.endsWith('.csv')) {
-        importedProducts = parseCSVtoProducts(result);
-      } else if (file.name.endsWith('.xlsx')) {
-        importedProducts = parseXLSXtoProducts(result);
-      } else {
-        alert('Unsupported file type');
-        return;
-      }
 
-      setImportPreview(importedProducts);
+        setImportPreviewProducts(importedProducts);
+        setShowImportPreview(true);
+      } catch (err) {
+        alert('Error reading file: ' + err.message);
+      }
     };
 
-    if (file.name.endsWith('.xlsx')) {
+    if (fileExt === 'xlsx') {
       reader.readAsBinaryString(file);
     } else {
       reader.readAsText(file);
     }
+    e.target.value = null; // reset input
   };
 
   const confirmImport = () => {
-    if (importPreview) {
-      setProducts(importPreview);
-      setImportPreview(null);
+    if (importPreviewProducts) {
+      setProducts(importPreviewProducts);
+      setImportPreviewProducts(null);
+      setShowImportPreview(false);
     }
   };
 
   const cancelImport = () => {
-    setImportPreview(null);
+    setImportPreviewProducts(null);
+    setShowImportPreview(false);
   };
 
+  // Export handlers
   const handleExport = () => {
-    if (!products.length) {
+    if (products.length === 0) {
       alert('No products to export');
       return;
     }
-    let fileData = '';
-    let mimeType = '';
-    let fileExtension = '';
 
     if (exportFormat === 'json') {
-      fileData = JSON.stringify(products, null, 2);
-      mimeType = 'application/json';
-      fileExtension = 'json';
+      const dataStr = JSON.stringify(products, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      downloadFile(url, 'products.json');
     } else if (exportFormat === 'csv') {
-      const csvData = productsToShopifyCSV(products);
-      fileData = arrayToCSV(csvData);
-      mimeType = 'text/csv';
-      fileExtension = 'csv';
+      const csvArr = productsToShopifyCSV(products);
+      const csvStr = arrayToCSV(csvArr);
+      const blob = new Blob([csvStr], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      downloadFile(url, 'products.csv');
+    } else if (exportFormat === 'xlsx') {
+      const csvArr = productsToShopifyCSV(products);
+      const ws = XLSX.utils.json_to_sheet(csvArr);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Products');
+      XLSX.writeFile(wb, 'products.xlsx');
     }
+  };
 
-    const blob = new Blob([fileData], { type: mimeType });
-    const url = URL.createObjectURL(blob);
+  const downloadFile = (url, filename) => {
     const a = document.createElement('a');
     a.href = url;
-    a.download = `products_export.${fileExtension}`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -298,10 +313,21 @@ export default function App() {
 
       <div className="flex gap-4 mb-4">
         <button
-          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', tags: [] })}
+          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Add Product
+        </button>
+
+        <button
+          onClick={() => {
+            if (window.confirm('Are you sure you want to delete all products?')) {
+              setProducts([]);
+            }
+          }}
+          className="bg-red-700 text-white px-4 py-2 rounded"
+        >
+          Delete All
         </button>
 
         <div>
@@ -312,6 +338,7 @@ export default function App() {
           >
             <option value="json">Export JSON</option>
             <option value="csv">Export CSV</option>
+            <option value="xlsx">Export XLSX</option>
           </select>
           <button
             onClick={handleExport}
@@ -322,7 +349,7 @@ export default function App() {
         </div>
 
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
-          Import JSON, CSV or XLSX
+          Import
           <input
             type="file"
             accept=".json,.csv,.xlsx"
@@ -339,31 +366,6 @@ export default function App() {
           className="border px-3 py-2 rounded flex-grow"
         />
       </div>
-
-      {importPreview && (
-        <div className="mb-4 p-4 border rounded bg-yellow-100">
-          <h2 className="text-xl font-semibold mb-2">Import Preview ({importPreview.length} products)</h2>
-          <div className="max-h-64 overflow-y-auto border p-2 mb-2 bg-white rounded">
-            {importPreview.map((product) => (
-              <div key={product.id} className="border-b py-2">
-                <strong>{product.title}</strong> - Variants: {product.variants.length}
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={confirmImport}
-            className="bg-green-600 text-white px-4 py-2 rounded mr-2"
-          >
-            Confirm Import
-          </button>
-          <button
-            onClick={cancelImport}
-            className="bg-red-600 text-white px-4 py-2 rounded"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
 
       {filteredProducts.length === 0 && (
         <p>No products found.</p>
@@ -388,27 +390,24 @@ export default function App() {
               {product.variants.map((variant, i) => (
                 <div key={i} className="border rounded p-2 bg-gray-50">
                   <p><strong>SKU:</strong> {variant.sku || '-'}</p>
-                  <p>
-                    <strong>Options:</strong> {variant.option1 || ''} 
-                    {variant.option2 ? ` / ${variant.option2}` : ''} 
-                    {variant.option3 ? ` / ${variant.option3}` : ''}
-                  </p>
+                  <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
                   <p><strong>Price:</strong> {variant.price || '-'}</p>
                   <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
                   <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
                 </div>
               ))}
             </div>
+
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => setEditingProduct(product)}
-                className="bg-yellow-500 text-white px-3 py-1 rounded"
+                className="bg-yellow-500 px-3 py-1 rounded text-white"
               >
                 Edit
               </button>
               <button
                 onClick={() => handleDeleteProduct(product.id)}
-                className="bg-red-600 text-white px-3 py-1 rounded"
+                className="bg-red-600 px-3 py-1 rounded text-white"
               >
                 Delete
               </button>
@@ -423,6 +422,58 @@ export default function App() {
           onSave={handleSaveProduct}
           onCancel={() => setEditingProduct(null)}
         />
+      )}
+
+      {/* Import Preview Modal */}
+      {showImportPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded p-6 max-w-4xl max-h-[80vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Import Preview</h2>
+            <p>Review the imported products below. Confirm to replace your current products with these.</p>
+
+            {importPreviewProducts.length === 0 ? (
+              <p>No products to import.</p>
+            ) : (
+              importPreviewProducts.map((product) => (
+                <div key={product.id} className="border rounded p-3 my-3">
+                  <h3 className="font-semibold">{product.title}</h3>
+                  <p>{product.description}</p>
+                  <div className="flex gap-2 overflow-x-auto mt-2">
+                    {product.images.map((img, i) => (
+                      <img key={i} src={img} alt={product.title} className="w-16 h-16 object-cover rounded" />
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {product.variants.map((variant, i) => (
+                      <div key={i} className="border rounded p-2 bg-gray-50">
+                        <p><strong>SKU:</strong> {variant.sku || '-'}</p>
+                        <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
+                        <p><strong>Price:</strong> {variant.price || '-'}</p>
+                        <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
+                        <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+
+            <div className="mt-4 flex justify-end gap-4">
+              <button
+                onClick={cancelImport}
+                className="bg-gray-400 px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmImport}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Confirm Import
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
