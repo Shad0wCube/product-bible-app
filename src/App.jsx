@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
 import ProductEditor from './components/ProductEditor';
+import * as XLSX from 'xlsx';
 
-// Utility: CSV to array of objects
 function csvToArray(str, delimiter = ',') {
   const headers = str.slice(0, str.indexOf('\n')).split(delimiter);
   const rows = str.slice(str.indexOf('\n') + 1).split('\n').filter(Boolean);
@@ -15,7 +14,6 @@ function csvToArray(str, delimiter = ',') {
   });
 }
 
-// Utility: array of objects to CSV string
 function arrayToCSV(arr, delimiter = ',') {
   if (!arr.length) return '';
   const headers = Object.keys(arr[0]);
@@ -26,7 +24,6 @@ function arrayToCSV(arr, delimiter = ',') {
   return csvRows.join('\n');
 }
 
-// Convert your products structure to Shopify CSV format rows
 function productsToShopifyCSV(products) {
   const rows = [];
 
@@ -127,7 +124,6 @@ function productsToShopifyCSV(products) {
   return rows;
 }
 
-// Convert CSV string to products array
 function parseCSVtoProducts(csvStr) {
   const arr = csvToArray(csvStr);
   const productsMap = new Map();
@@ -146,16 +142,14 @@ function parseCSVtoProducts(csvStr) {
         variants: [],
       });
     }
-
     const product = productsMap.get(handle);
 
-    // Add image if not duplicate
     if (row['Image Src'] && !product.images.includes(row['Image Src'])) {
       product.images.push(row['Image Src']);
     }
 
-    // Add variant if SKU present
-    if (row['Variant SKU']) {
+    // Skip blank SKU variants
+    if (row['Variant SKU']?.trim()) {
       product.variants.push({
         sku: row['Variant SKU'],
         option1: row['Option1 Value'],
@@ -171,6 +165,14 @@ function parseCSVtoProducts(csvStr) {
   return Array.from(productsMap.values());
 }
 
+function parseXLSXtoProducts(data) {
+  const workbook = XLSX.read(data, { type: 'binary' });
+  const firstSheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[firstSheetName];
+  const csvStr = XLSX.utils.sheet_to_csv(sheet);
+  return parseCSVtoProducts(csvStr);
+}
+
 export default function App() {
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('products');
@@ -180,10 +182,7 @@ export default function App() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [exportFormat, setExportFormat] = useState('json');
-
-  // Import preview and modal toggle
-  const [importPreview, setImportPreview] = useState([]);
-  const [showPreview, setShowPreview] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('products', JSON.stringify(products));
@@ -218,95 +217,79 @@ export default function App() {
     }
   };
 
-  // Combined import handler for JSON, CSV, XLSX with preview
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    const fileExt = file.name.split('.').pop().toLowerCase();
-
     reader.onload = (event) => {
-      let parsed = [];
+      const result = event.target.result;
+      let importedProducts = [];
 
-      try {
-        if (fileExt === 'json') {
-          const json = JSON.parse(event.target.result);
-          if (Array.isArray(json)) parsed = json;
-          else alert('Invalid JSON format: must be an array of products.');
-        } else if (fileExt === 'csv') {
-          parsed = parseCSVtoProducts(event.target.result);
-        } else if (fileExt === 'xlsx') {
-          const workbook = XLSX.read(event.target.result, { type: 'binary' });
-          const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const csv = XLSX.utils.sheet_to_csv(sheet);
-          parsed = parseCSVtoProducts(csv);
-        } else {
-          alert('Unsupported file type.');
+      if (file.name.endsWith('.json')) {
+        try {
+          importedProducts = JSON.parse(result);
+        } catch {
+          alert('Invalid JSON file');
           return;
         }
-      } catch (err) {
-        alert('Failed to parse file: ' + err.message);
+      } else if (file.name.endsWith('.csv')) {
+        importedProducts = parseCSVtoProducts(result);
+      } else if (file.name.endsWith('.xlsx')) {
+        importedProducts = parseXLSXtoProducts(result);
+      } else {
+        alert('Unsupported file type');
         return;
       }
 
-      if (parsed.length) {
-        setImportPreview(parsed);
-        setShowPreview(true);
-      } else {
-        alert('No valid products found in import.');
-      }
+      setImportPreview(importedProducts);
     };
 
-    if (fileExt === 'xlsx') {
+    if (file.name.endsWith('.xlsx')) {
       reader.readAsBinaryString(file);
     } else {
       reader.readAsText(file);
     }
   };
 
-  // Confirm import: replace current products with preview
   const confirmImport = () => {
-    setProducts(importPreview);
-    setImportPreview([]);
-    setShowPreview(false);
+    if (importPreview) {
+      setProducts(importPreview);
+      setImportPreview(null);
+    }
   };
 
-  // Export handler for JSON, CSV, XLSX
+  const cancelImport = () => {
+    setImportPreview(null);
+  };
+
   const handleExport = () => {
-    if (exportFormat === 'json') {
-      const dataStr = JSON.stringify(products, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-export.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (exportFormat === 'csv') {
-      const csvRows = productsToShopifyCSV(products);
-      const csvStr = arrayToCSV(csvRows);
-      const blob = new Blob([csvStr], { type: 'text/csv' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-export.csv';
-      a.click();
-      URL.revokeObjectURL(url);
-    } else if (exportFormat === 'xlsx') {
-      const csvRows = productsToShopifyCSV(products);
-      const ws = XLSX.utils.json_to_sheet(csvRows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Products');
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'products-export.xlsx';
-      a.click();
-      URL.revokeObjectURL(url);
+    if (!products.length) {
+      alert('No products to export');
+      return;
     }
+    let fileData = '';
+    let mimeType = '';
+    let fileExtension = '';
+
+    if (exportFormat === 'json') {
+      fileData = JSON.stringify(products, null, 2);
+      mimeType = 'application/json';
+      fileExtension = 'json';
+    } else if (exportFormat === 'csv') {
+      const csvData = productsToShopifyCSV(products);
+      fileData = arrayToCSV(csvData);
+      mimeType = 'text/csv';
+      fileExtension = 'csv';
+    }
+
+    const blob = new Blob([fileData], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products_export.${fileExtension}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -315,9 +298,7 @@ export default function App() {
 
       <div className="flex gap-4 mb-4">
         <button
-          onClick={() =>
-            setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })
-          }
+          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', tags: [] })}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Add Product
@@ -329,9 +310,8 @@ export default function App() {
             onChange={(e) => setExportFormat(e.target.value)}
             className="border rounded px-2 py-1 mr-2"
           >
-            <option value="json">JSON</option>
-            <option value="csv">CSV</option>
-            <option value="xlsx">XLSX</option>
+            <option value="json">Export JSON</option>
+            <option value="csv">Export CSV</option>
           </select>
           <button
             onClick={handleExport}
@@ -342,7 +322,7 @@ export default function App() {
         </div>
 
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
-          Import File
+          Import JSON, CSV or XLSX
           <input
             type="file"
             accept=".json,.csv,.xlsx"
@@ -360,7 +340,34 @@ export default function App() {
         />
       </div>
 
-      {filteredProducts.length === 0 && <p>No products found.</p>}
+      {importPreview && (
+        <div className="mb-4 p-4 border rounded bg-yellow-100">
+          <h2 className="text-xl font-semibold mb-2">Import Preview ({importPreview.length} products)</h2>
+          <div className="max-h-64 overflow-y-auto border p-2 mb-2 bg-white rounded">
+            {importPreview.map((product) => (
+              <div key={product.id} className="border-b py-2">
+                <strong>{product.title}</strong> - Variants: {product.variants.length}
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={confirmImport}
+            className="bg-green-600 text-white px-4 py-2 rounded mr-2"
+          >
+            Confirm Import
+          </button>
+          <button
+            onClick={cancelImport}
+            className="bg-red-600 text-white px-4 py-2 rounded"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {filteredProducts.length === 0 && (
+        <p>No products found.</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProducts.map((product) => (
@@ -381,7 +388,42 @@ export default function App() {
               {product.variants.map((variant, i) => (
                 <div key={i} className="border rounded p-2 bg-gray-50">
                   <p><strong>SKU:</strong> {variant.sku || '-'}</p>
-                  <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
+                  <p>
+                    <strong>Options:</strong> {variant.option1 || ''} 
+                    {variant.option2 ? ` / ${variant.option2}` : ''} 
+                    {variant.option3 ? ` / ${variant.option3}` : ''}
+                  </p>
                   <p><strong>Price:</strong> {variant.price || '-'}</p>
                   <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
-                  <p><strong>Barcode:</strong> {variant
+                  <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setEditingProduct(product)}
+                className="bg-yellow-500 text-white px-3 py-1 rounded"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteProduct(product.id)}
+                className="bg-red-600 text-white px-3 py-1 rounded"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {editingProduct && (
+        <ProductEditor
+          product={editingProduct}
+          onSave={handleSaveProduct}
+          onCancel={() => setEditingProduct(null)}
+        />
+      )}
+    </div>
+  );
+}
