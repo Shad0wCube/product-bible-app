@@ -51,20 +51,12 @@ export default function ProductEditor({ product, onSave, onCancel }) {
   const removeVariant = (index) => setVariants(variants.filter((_, i) => i !== index));
 
   const handleSubmit = () => {
-    onSave({
-      ...product,
-      title,
-      description,
-      categories,
-      tags,
-      images,
-      variants,
-    });
+    onSave({ ...product, title, description, categories, tags, images, variants });
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white p-6 rounded shadow max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded shadow max-w-4xl w-full overflow-y-auto max-h-[90vh]">
         <h2 className="text-2xl font-bold mb-4">Edit Product</h2>
         <div className="space-y-4">
           <input
@@ -136,27 +128,21 @@ export default function ProductEditor({ product, onSave, onCancel }) {
                     type="text"
                     placeholder="Option 1"
                     value={v.option1}
-                    onChange={(e) =>
-                      handleVariantChange(i, 'option1', e.target.value)
-                    }
+                    onChange={(e) => handleVariantChange(i, 'option1', e.target.value)}
                     className="border rounded p-1 w-1/3"
                   />
                   <input
                     type="text"
                     placeholder="Option 2"
                     value={v.option2}
-                    onChange={(e) =>
-                      handleVariantChange(i, 'option2', e.target.value)
-                    }
+                    onChange={(e) => handleVariantChange(i, 'option2', e.target.value)}
                     className="border rounded p-1 w-1/3"
                   />
                   <input
                     type="text"
                     placeholder="Option 3"
                     value={v.option3}
-                    onChange={(e) =>
-                      handleVariantChange(i, 'option3', e.target.value)
-                    }
+                    onChange={(e) => handleVariantChange(i, 'option3', e.target.value)}
                     className="border rounded p-1 w-1/3"
                   />
                 </div>
@@ -172,18 +158,14 @@ export default function ProductEditor({ product, onSave, onCancel }) {
                     type="text"
                     placeholder="Quantity"
                     value={v.quantity}
-                    onChange={(e) =>
-                      handleVariantChange(i, 'quantity', e.target.value)
-                    }
+                    onChange={(e) => handleVariantChange(i, 'quantity', e.target.value)}
                     className="border rounded p-1 w-1/3"
                   />
                   <input
                     type="text"
                     placeholder="Barcode"
                     value={v.barcode}
-                    onChange={(e) =>
-                      handleVariantChange(i, 'barcode', e.target.value)
-                    }
+                    onChange={(e) => handleVariantChange(i, 'barcode', e.target.value)}
                     className="border rounded p-1 w-1/3"
                   />
                 </div>
@@ -204,18 +186,8 @@ export default function ProductEditor({ product, onSave, onCancel }) {
           </div>
 
           <div className="flex justify-end gap-4 mt-6">
-            <button
-              onClick={onCancel}
-              className="px-4 py-2 rounded bg-gray-300"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="px-4 py-2 rounded bg-blue-600 text-white"
-            >
-              Save
-            </button>
+            <button onClick={onCancel} className="px-4 py-2 rounded bg-gray-300">Cancel</button>
+            <button onClick={handleSubmit} className="px-4 py-2 rounded bg-blue-600 text-white">Save</button>
           </div>
         </div>
       </div>
