@@ -1,6 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import ProductEditor from './components/ProductEditor';
 
+// Simple CSV parser for your product format
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return null;
+
+  const headers = lines[0].split(',').map(h => h.trim());
+  const productsMap = new Map();
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(',').map(c => c.trim());
+    if (row.length !== headers.length) continue;
+
+    // Build product and variant keys from CSV columns:
+    // We'll assume the CSV columns are:
+    // Handle,Title,Body (HTML),Vendor,Type,Tags,Published,
+    // Option1 Name,Option1 Value,Option2 Name,Option2 Value,Option3 Name,Option3 Value,
+    // Variant SKU,Variant Price,Variant Inventory Qty,Variant Barcode,Image Src
+
+    // Find indexes for these headers (lowercase and trimmed)
+    const idx = (name) => headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+    const handle = row[idx('Handle')];
+    if (!handle) continue;
+
+    // Create or get existing product
+    let product = productsMap.get(handle);
+    if (!product) {
+      product = {
+        id: handle,
+        title: row[idx('Title')] || '',
+        description: row[idx('Body (HTML)')] || '',
+        categories: [], // Not from CSV, you can map Vendor/Type if you want
+        tags: row[idx('Tags')] ? row[idx('Tags')].split(',').map(t => t.trim()) : [],
+        images: row[idx('Image Src')] ? [row[idx('Image Src')]] : [],
+        variants: [],
+      };
+      productsMap.set(handle, product);
+    } else {
+      // Add image if exists and not duplicate
+      const img = row[idx('Image Src')];
+      if (img && !product.images.includes(img)) {
+        product.images.push(img);
+      }
+    }
+
+    // Add variant
+    const variant = {
+      sku: row[idx('Variant SKU')] || '',
+      option1: row[idx('Option1 Value')] || '',
+      option2: row[idx('Option2 Value')] || '',
+      option3: row[idx('Option3 Value')] || '',
+      price: row[idx('Variant Price')] || '',
+      quantity: row[idx('Variant Inventory Qty')] || '',
+      barcode: row[idx('Variant Barcode')] || '',
+    };
+
+    product.variants.push(variant);
+  }
+
+  return Array.from(productsMap.values());
+}
+
 export default function App() {
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem('products');
@@ -14,6 +76,7 @@ export default function App() {
     localStorage.setItem('products', JSON.stringify(products));
   }, [products]);
 
+  // Filter products by title, SKU, or barcode
   const filteredProducts = products.filter((product) => {
     const term = searchTerm.toLowerCase();
     return (
@@ -43,6 +106,7 @@ export default function App() {
     }
   };
 
+  // JSON Export
   const handleExportJSON = () => {
     const dataStr = JSON.stringify(products, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -54,69 +118,39 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportJSON = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const imported = JSON.parse(ev.target.result);
-        if (Array.isArray(imported)) {
-          setProducts(imported);
-        } else {
-          alert('Invalid file format.');
-        }
-      } catch {
-        alert('Failed to parse JSON.');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // Export CSV compatible with Shopify import rules
+  // CSV Export
   const handleExportCSV = () => {
-    if (products.length === 0) {
-      alert('No products to export.');
-      return;
-    }
+    const header = [
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Type', 'Tags', 'Published',
+      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value', 'Option3 Name', 'Option3 Value',
+      'Variant SKU', 'Variant Price', 'Variant Inventory Qty', 'Variant Barcode', 'Image Src'
+    ];
 
-    const rows = [];
+    let csv = header.join(',') + '\n';
 
-    products.forEach((product) => {
-      product.variants.forEach((variant, index) => {
-        rows.push({
-          Handle: product.id,
-          Title: index === 0 ? product.title : '',
-          Body: index === 0 ? product.description : '',
-          Tags: index === 0 ? product.tags.join(', ') : '',
-          Option1: variant.option1,
-          Option2: variant.option2,
-          Option3: variant.option3,
-          "Variant SKU": variant.sku,
-          "Variant Price": variant.price,
-          "Variant Inventory Qty": variant.quantity,
-          "Variant Barcode": variant.barcode,
-          "Image Src": product.images[index] || '',
-        });
+    products.forEach(product => {
+      product.variants.forEach(variant => {
+        csv += [
+          product.id || '',
+          `"${product.title.replace(/"/g, '""')}"`,
+          `"${(product.description || '').replace(/"/g, '""')}"`,
+          '', // Vendor (optional)
+          '', // Type (optional)
+          product.tags ? `"${product.tags.join(',').replace(/"/g, '""')}"` : '',
+          'TRUE',
+          'Option1', variant.option1 || '',
+          'Option2', variant.option2 || '',
+          'Option3', variant.option3 || '',
+          variant.sku || '',
+          variant.price || '',
+          variant.quantity || '',
+          variant.barcode || '',
+          product.images.length > 0 ? product.images[0] : ''
+        ].map(value => value.toString().replace(/\n/g, ' ')).join(',') + '\n';
       });
     });
 
-    const headers = Object.keys(rows[0]);
-    const csvContent =
-      headers.join(',') +
-      '\n' +
-      rows
-        .map((row) =>
-          headers
-            .map((field) => {
-              const escaped = (row[field] ?? '').toString().replace(/"/g, '""');
-              return `"${escaped}"`;
-            })
-            .join(',')
-        )
-        .join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -125,62 +159,51 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  // Import CSV (basic implementation, assumes header row matches export format)
-  const handleImportCSV = (e) => {
+  // Unified export with format prompt
+  const handleExport = () => {
+    const format = window.prompt('Export format? Type "json" or "csv"', 'json');
+    if (format === 'json') {
+      handleExportJSON();
+    } else if (format === 'csv') {
+      handleExportCSV();
+    } else {
+      alert('Invalid export format.');
+    }
+  };
+
+  // Unified import handler for JSON and CSV
+  const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const ext = file.name.split('.').pop().toLowerCase();
     const reader = new FileReader();
+
     reader.onload = (ev) => {
-      const text = ev.target.result;
       try {
-        const lines = text.split('\n').filter((line) => line.trim() !== '');
-        const headers = lines[0].split(',').map((h) => h.replace(/(^"|"$)/g, '').trim());
-
-        const importedProducts = {};
-        for (let i = 1; i < lines.length; i++) {
-          const row = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // CSV split respecting quotes
-          const obj = {};
-          headers.forEach((header, idx) => {
-            obj[header] = row[idx]?.replace(/(^"|"$)/g, '') || '';
-          });
-
-          const handle = obj['Handle'] || `product-${i}`;
-          if (!importedProducts[handle]) {
-            importedProducts[handle] = {
-              id: handle,
-              title: obj['Title'],
-              description: obj['Body'],
-              tags: obj['Tags'] ? obj['Tags'].split(',').map((t) => t.trim()) : [],
-              images: [],
-              variants: [],
-            };
+        if (ext === 'json') {
+          const imported = JSON.parse(ev.target.result);
+          if (Array.isArray(imported)) {
+            setProducts(imported);
+          } else {
+            alert('Invalid JSON format.');
           }
-
-          // Add variant
-          importedProducts[handle].variants.push({
-            option1: obj['Option1'],
-            option2: obj['Option2'],
-            option3: obj['Option3'],
-            sku: obj['Variant SKU'],
-            price: obj['Variant Price'],
-            quantity: obj['Variant Inventory Qty'],
-            barcode: obj['Variant Barcode'],
-          });
-
-          // Add image if present and not duplicate
-          const img = obj['Image Src'];
-          if (img && !importedProducts[handle].images.includes(img)) {
-            importedProducts[handle].images.push(img);
-          }
+        } else if (ext === 'csv') {
+          const text = ev.target.result;
+          const parsedProducts = parseCSV(text);
+          if (parsedProducts) setProducts(parsedProducts);
+          else alert('Invalid CSV format.');
+        } else {
+          alert('Unsupported file format.');
         }
-
-        setProducts(Object.values(importedProducts));
-      } catch (err) {
-        alert('Failed to parse CSV.');
+      } catch {
+        alert('Failed to parse file.');
       }
     };
+
     reader.readAsText(file);
+    // Reset input so same file can be re-imported if needed
+    e.target.value = '';
   };
 
   return (
@@ -189,52 +212,25 @@ export default function App() {
 
       <div className="flex gap-4 mb-4">
         <button
-          onClick={() =>
-            setEditingProduct({
-              id: null,
-              title: '',
-              variants: [],
-              images: [],
-              description: '',
-              categories: [],
-              tags: [],
-            })
-          }
+          onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Add Product
         </button>
 
         <button
-          onClick={handleExportJSON}
+          onClick={handleExport}
           className="bg-green-600 text-white px-4 py-2 rounded"
         >
-          Export JSON
+          Export JSON or CSV
         </button>
 
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
-          Import JSON
+          Import JSON or CSV
           <input
             type="file"
-            accept=".json"
-            onChange={handleImportJSON}
-            className="hidden"
-          />
-        </label>
-
-        <button
-          onClick={handleExportCSV}
-          className="bg-green-700 text-white px-4 py-2 rounded"
-        >
-          Export CSV
-        </button>
-
-        <label className="bg-gray-400 px-4 py-2 rounded cursor-pointer">
-          Import CSV
-          <input
-            type="file"
-            accept=".csv"
-            onChange={handleImportCSV}
+            accept=".json,.csv"
+            onChange={handleImport}
             className="hidden"
           />
         </label>
@@ -248,7 +244,9 @@ export default function App() {
         />
       </div>
 
-      {filteredProducts.length === 0 && <p>No products found.</p>}
+      {filteredProducts.length === 0 && (
+        <p>No products found.</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredProducts.map((product) => (
@@ -268,23 +266,11 @@ export default function App() {
             <div className="grid grid-cols-3 gap-2">
               {product.variants.map((variant, i) => (
                 <div key={i} className="border rounded p-2 bg-gray-50">
-                  <p>
-                    <strong>SKU:</strong> {variant.sku || '-'}
-                  </p>
-                  <p>
-                    <strong>Options:</strong> {variant.option1 || ''}{' '}
-                    {variant.option2 ? `/ ${variant.option2}` : ''}{' '}
-                    {variant.option3 ? `/ ${variant.option3}` : ''}
-                  </p>
-                  <p>
-                    <strong>Price:</strong> {variant.price || '-'}
-                  </p>
-                  <p>
-                    <strong>Quantity:</strong> {variant.quantity || '-'}
-                  </p>
-                  <p>
-                    <strong>Barcode:</strong> {variant.barcode || '-'}
-                  </p>
+                  <p><strong>SKU:</strong> {variant.sku || '-'}</p>
+                  <p><strong>Options:</strong> {variant.option1 || ''} {variant.option2 ? `/ ${variant.option2}` : ''} {variant.option3 ? `/ ${variant.option3}` : ''}</p>
+                  <p><strong>Price:</strong> {variant.price || '-'}</p>
+                  <p><strong>Quantity:</strong> {variant.quantity || '-'}</p>
+                  <p><strong>Barcode:</strong> {variant.barcode || '-'}</p>
                 </div>
               ))}
             </div>
