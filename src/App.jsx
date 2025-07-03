@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ProductEditor from './components/ProductEditor';
+import Papa from 'papaparse';
 
 export default function App() {
   const [products, setProducts] = useState(() => {
@@ -73,11 +74,84 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  const handleExportCSV = () => {
+    const rows = [];
+    products.forEach((product) => {
+      product.variants.forEach((variant, index) => {
+        rows.push({
+          Handle: product.id,
+          Title: index === 0 ? product.title : '',
+          Body: index === 0 ? product.description : '',
+          Tags: index === 0 ? product.tags.join(', ') : '',
+          Option1: variant.option1,
+          Option2: variant.option2,
+          Option3: variant.option3,
+          Variant SKU: variant.sku,
+          Variant Price: variant.price,
+          Variant Inventory Qty: variant.quantity,
+          Variant Barcode: variant.barcode,
+          Image Src: product.images[index] || '',
+        });
+      });
+    });
+
+    const csv = Papa.unparse(rows);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products-export.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: ({ data }) => {
+        const grouped = {};
+        data.forEach((row) => {
+          const id = row.Handle || Date.now().toString();
+          if (!grouped[id]) {
+            grouped[id] = {
+              id,
+              title: row.Title || '',
+              description: row.Body || '',
+              tags: row.Tags ? row.Tags.split(',').map((t) => t.trim()) : [],
+              images: [],
+              variants: [],
+              categories: [],
+            };
+          }
+
+          grouped[id].variants.push({
+            sku: row['Variant SKU'],
+            option1: row['Option1'],
+            option2: row['Option2'],
+            option3: row['Option3'],
+            price: row['Variant Price'],
+            quantity: row['Variant Inventory Qty'],
+            barcode: row['Variant Barcode'],
+          });
+
+          if (row['Image Src']) {
+            grouped[id].images.push(row['Image Src']);
+          }
+        });
+
+        setProducts(Object.values(grouped));
+      },
+    });
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-4xl font-bold mb-6">Product Bible</h1>
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4 mb-4 flex-wrap">
         <button
           onClick={() => setEditingProduct({ id: null, title: '', variants: [], images: [], description: '', categories: [], tags: [] })}
           className="bg-blue-600 text-white px-4 py-2 rounded"
@@ -92,12 +166,29 @@ export default function App() {
           Export JSON
         </button>
 
+        <button
+          onClick={handleExportCSV}
+          className="bg-green-700 text-white px-4 py-2 rounded"
+        >
+          Export CSV
+        </button>
+
         <label className="bg-gray-300 px-4 py-2 rounded cursor-pointer">
           Import JSON
           <input
             type="file"
             accept=".json"
             onChange={handleImportJSON}
+            className="hidden"
+          />
+        </label>
+
+        <label className="bg-gray-400 px-4 py-2 rounded cursor-pointer">
+          Import CSV
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
             className="hidden"
           />
         </label>
@@ -124,7 +215,7 @@ export default function App() {
                 <img
                   key={i}
                   src={src}
-                  alt={`${product.title} ${i + 1}`}
+                  alt={`Image ${i + 1}`}
                   className="w-20 h-20 object-cover rounded cursor-pointer"
                   onClick={() => window.open(src, '_blank')}
                 />
